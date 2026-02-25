@@ -1,0 +1,45 @@
+# Backend
+restaurant-backend/target/
+restaurant-backend/.idea/
+restaurant-backend/*.iml
+restaurant-backend/logs/
+*.class
+*.jar
+*.war
+*.ear
+
+# Frontend
+restaurant-frontend/node_modules/
+restaurant-frontend/dist/
+restaurant-frontend/.vite/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+
+# Temporary
+tmp/
+temp/
+*.tmp
