@@ -4,7 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.restaurant.common.exception.BusinessException;
 import com.restaurant.dish.entity.Dish;
 import com.restaurant.dish.mapper.DishMapper;
-import com.restaurant.order.dto.*;
+import com.restaurant.order.dto.AddDishRequest;
+import com.restaurant.order.dto.BatchAddDishRequest;
+import com.restaurant.order.dto.CartItemDTO;
+import com.restaurant.order.dto.CreateOrderRequest;
+import com.restaurant.order.dto.OrderDetailDTO;
+import com.restaurant.order.dto.PayOrderRequest;
 import com.restaurant.order.entity.Order;
 import com.restaurant.order.entity.OrderItem;
 import com.restaurant.order.mapper.OrderItemMapper;
@@ -186,6 +191,69 @@ public class OrderService {
             dish.setStock(dish.getStock() - request.getQuantity());
             dishMapper.updateById(dish);
         }
+    }
+
+    @Transactional
+    public Order batchAddDishToOrder(BatchAddDishRequest request) {
+        // 1. 先查询该桌台是否有未完成订单
+        LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Order::getTableId, request.getTableId())
+               .lt(Order::getStatus, 4)  // 未完成（状态 < 4）
+               .orderByDesc(Order::getCreatedAt)
+               .last("LIMIT 1");
+        
+        Order order = orderMapper.selectOne(wrapper);
+        
+        // 如果没有未完成订单，抛异常
+        if (order == null) {
+            throw new BusinessException("该桌台没有未完成订单，无法加菜");
+        }
+        
+        // 如果订单已完成，无法加菜
+        if (order.getStatus() >= 4) {
+            throw new BusinessException("订单已完成，无法加菜");
+        }
+
+        // 2. 批量添加菜品到订单
+        BigDecimal totalAddAmount = BigDecimal.ZERO;
+        
+        for (BatchAddDishRequest.AddDishItemRequest itemRequest : request.getItems()) {
+            Dish dish = dishMapper.selectById(itemRequest.getDishId());
+            if (dish == null || dish.getStatus() != 1) {
+                throw new BusinessException("菜品不存在或已下架: " + itemRequest.getDishId());
+            }
+            if (dish.getStock() > 0 && dish.getStock() < itemRequest.getQuantity()) {
+                throw new BusinessException("菜品库存不足: " + dish.getName());
+            }
+
+            OrderItem item = new OrderItem();
+            item.setOrderId(order.getId());
+            item.setDishId(dish.getId());
+            item.setDishName(dish.getName());
+            item.setDishImage(dish.getImage());
+            item.setPrice(dish.getPrice());
+            item.setQuantity(itemRequest.getQuantity());
+            item.setRemark(itemRequest.getRemark());
+            item.setSubtotal(dish.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity())));
+            item.setStatus(0); // 待制作
+
+            orderItemMapper.insert(item);
+            
+            totalAddAmount = totalAddAmount.add(item.getSubtotal());
+
+            // 扣减库存
+            if (dish.getStock() > 0) {
+                dish.setStock(dish.getStock() - itemRequest.getQuantity());
+                dishMapper.updateById(dish);
+            }
+        }
+
+        // 3. 更新订单金额
+        order.setTotalAmount(order.getTotalAmount().add(totalAddAmount));
+        order.setPayAmount(order.getPayAmount().add(totalAddAmount));
+        orderMapper.updateById(order);
+
+        return order;
     }
 
     @Transactional

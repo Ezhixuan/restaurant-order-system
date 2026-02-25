@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getOrderDetail, getOrderByTable, updateItemStatus, payOrder, completeOrder, addDishToOrder } from '@/api/order'
+import { getOrderByTable, updateItemStatus, payOrder, getUnpaidAmount } from '@/api/order'
 import { useCartStore } from '@/stores/cart'
 
 const route = useRoute()
@@ -10,9 +10,11 @@ const router = useRouter()
 const cartStore = useCartStore()
 
 const tableId = ref(Number(route.query.tableId) || 0)
+const tableNo = ref(route.query.tableNo as string || '')
 const order = ref<any>(null)
 const items = ref<any[]>([])
 const loading = ref(false)
+const unpaidAmount = ref(0)
 
 // 结账对话框
 const checkoutVisible = ref(false)
@@ -32,21 +34,39 @@ const loadOrder = async () => {
 
   loading.value = true
   try {
-    // 使用新的 API 根据桌台ID获取订单
     const detail = await getOrderByTable(tableId.value)
 
     if (detail) {
       order.value = detail.order
-      items.value = detail.items
+      items.value = detail.items || []
+      
+      // 获取未结账金额
+      if (order.value?.id) {
+        try {
+          const amount = await getUnpaidAmount(order.value.id)
+          unpaidAmount.value = amount || 0
+        } catch (e) {
+          // 如果接口不存在，手动计算
+          unpaidAmount.value = calculateUnpaidAmount(items.value)
+        }
+      }
     } else {
       ElMessage.warning('该桌台暂无未完成订单')
-      // 可选：返回桌台列表或显示空状态
+      items.value = []
     }
   } catch (error) {
     ElMessage.error('加载订单失败')
+    console.error(error)
   } finally {
     loading.value = false
   }
+}
+
+// 手动计算未结账金额（备选）
+const calculateUnpaidAmount = (items: any[]) => {
+  return items
+    .filter(item => !item.isPaid)
+    .reduce((sum, item) => sum + (item.subtotal || 0), 0)
 }
 
 const getStatusType = (status: number) => {
@@ -61,22 +81,22 @@ const getStatusLabel = (status: number) => {
 
 const getOrderStatusType = (status: number) => {
   const map: Record<number, string> = {
-    0: 'warning',
-    1: 'success',
-    2: 'primary',
-    3: 'info',
-    4: 'success'
+    0: 'info',      // 待上菜
+    1: 'warning',   // 上菜中
+    2: 'success',   // 待结账
+    3: 'success',   // 已完成
+    4: 'danger'     // 追加订单
   }
   return map[status] || 'info'
 }
 
 const getOrderStatusLabel = (status: number) => {
   const map: Record<number, string> = {
-    0: '待支付',
-    1: '已支付',
-    2: '制作中',
-    3: '待上菜',
-    4: '已完成'
+    0: '待上菜',
+    1: '上菜中',
+    2: '待结账',
+    3: '已完成',
+    4: '追加订单'
   }
   return map[status] || '未知'
 }
@@ -95,6 +115,14 @@ const handleUpdateStatus = async (item: any, newStatus: number) => {
 // 打开结账对话框
 const openCheckout = () => {
   if (!order.value) return
+  
+  // 计算应付金额
+  const shouldPay = unpaidAmount.value
+  if (shouldPay <= 0) {
+    ElMessage.warning('没有待结账的金额')
+    return
+  }
+  
   checkoutVisible.value = true
 }
 
@@ -103,22 +131,14 @@ const confirmCheckout = async () => {
   if (!order.value) return
   
   try {
-    // 先支付
     await payOrder(order.value.id, {
       payType: payType.value,
-      amount: order.value.payAmount
+      amount: unpaidAmount.value
     })
-    
-    // 再完成订单
-    await completeOrder(order.value.id)
     
     ElMessage.success('结账成功')
     checkoutVisible.value = false
-    
-    // 返回桌台列表
-    setTimeout(() => {
-      router.push('/pad/tables')
-    }, 1000)
+    loadOrder() // 刷新
   } catch (error: any) {
     ElMessage.error(error.message || '结账失败')
   }
@@ -136,7 +156,8 @@ const addMore = () => {
     query: { 
       mode: 'add',
       orderId: order.value.id,
-      tableId: order.value.tableId
+      tableId: order.value.tableId,
+      tableNo: order.value.tableNo
     }
   })
 }
@@ -190,7 +211,12 @@ onMounted(loadOrder)
           
           <div class="info-item amount">
             <div class="info-label">应收金额</div>
-            <div class="info-value">¥{{ order.payAmount?.toFixed(2) }}</div>
+            <div class="info-value" :class="{ 'text-danger': unpaidAmount > 0 }">
+              ¥{{ unpaidAmount.toFixed(2) }}
+              <span v-if="unpaidAmount !== order.payAmount" class="total-amount">
+                (总计: ¥{{ order.payAmount?.toFixed(2) }})
+              </span>
+            </div>
           </div>
         </div>
       </el-card>
@@ -206,23 +232,24 @@ onMounted(loadOrder)
           </div>
         </template>
 
-        <div class="items-list">
+        <div v-if="items.length > 0" class="items-list">
           <div
             v-for="item in items"
             :key="item.id"
             class="item-row"
-            :class="{ 'finished': item.status === 2 }"
+            :class="{ 'finished': item.status === 2, 'paid': item.isPaid }"
           >
             <div class="item-main">
               <div class="item-image">
                 <img :src="item.dishImage || 'https://img.yzcdn.cn/vant/ipad.jpeg'" />
+                <div v-if="item.isPaid" class="paid-badge">已结账</div>
               </div>
               
               <div class="item-info">
                 <div class="item-name">{{ item.dishName }}</div>
                 <div class="item-meta">
                   <span class="item-price">¥{{ item.price?.toFixed(2) }} x {{ item.quantity }}</span>
-                  <span class="item-subtotal">¥{{ item.subtotal?.toFixed(2) }}</span>
+                  <span class="item-subtotal" :class="{ 'is-paid': item.isPaid }">¥{{ item.subtotal?.toFixed(2) }}</span>
                 </div>
                 
                 <div v-if="item.remark" class="item-remark">
@@ -238,10 +265,11 @@ onMounted(loadOrder)
             </div>
             
             <div class="item-actions">
-              <el-button-group v-if="item.status !== 2">
+              <el-button-group v-if="!item.isPaid">
                 <el-button
                   v-if="item.status === 0"
                   type="warning"
+                  size="small"
                   @click="handleUpdateStatus(item, 1)"
                 >
                   开始制作
@@ -249,43 +277,45 @@ onMounted(loadOrder)
                 <el-button
                   v-if="item.status === 1"
                   type="success"
+                  size="small"
                   @click="handleUpdateStatus(item, 2)"
                 >
                   制作完成
                 </el-button>
+                <el-button
+                  v-if="item.status === 2"
+                  type="primary"
+                  size="small"
+                  disabled
+                >
+                  已完成
+                </el-button>
               </el-button-group>
               
-              <div v-else class="completed-text">✓ 已完成</div>
+              <div v-else class="completed-text">✓ 已结账</div>
             </div>
           </div>
         </div>
         
-        <van-empty v-if="items.length === 0" description="暂无菜品" />
+        <van-empty v-else description="暂无菜品" />
       </el-card>
 
       <!-- 底部操作栏 -->
-      <div v-if="order.status !== 4" class="bottom-bar">
+      <div class="bottom-bar">
         <div class="total-section">
-          <div class="total-label">合计</div>
-          <div class="total-value">¥{{ order.payAmount?.toFixed(2) }}</div>
+          <div class="total-label">未结账金额</div>
+          <div class="total-value" :class="{ 'text-danger': unpaidAmount > 0 }">
+            ¥{{ unpaidAmount.toFixed(2) }}
+          </div>
         </div>
         
         <el-button
-          v-if="order.status >= 3"
           type="success"
           size="large"
+          :disabled="unpaidAmount <= 0"
           @click="openCheckout"
         >
           结账
-        </el-button>
-        
-        <el-button
-          v-else
-          type="primary"
-          size="large"
-          @click="addMore"
-        >
-          继续点餐
         </el-button>
       </div>
     </div>
@@ -298,7 +328,7 @@ onMounted(loadOrder)
       <div v-if="order" class="checkout-content">
         <div class="checkout-amount">
           <div class="amount-label">应收金额</div>
-          <div class="amount-value">¥{{ order.payAmount?.toFixed(2) }}</div>
+          <div class="amount-value">¥{{ unpaidAmount.toFixed(2) }}</div>
         </div>
         
         <el-divider />
@@ -322,7 +352,7 @@ onMounted(loadOrder)
         <el-divider />
         
         <el-alert
-          title="确认后桌台将自动清台"
+          title="确认后该批次菜品将标记为已结账"
           type="info"
           :closable="false"
           center
@@ -402,9 +432,18 @@ onMounted(loadOrder)
 }
 
 .info-item.amount .info-value {
-  color: #f56c6c;
   font-size: 24px;
   font-weight: bold;
+}
+
+.text-danger {
+  color: #f56c6c;
+}
+
+.total-amount {
+  font-size: 14px;
+  color: #909399;
+  margin-left: 5px;
 }
 
 .info-label {
@@ -444,7 +483,7 @@ onMounted(loadOrder)
   gap: 15px;
 }
 
-.item-row.finished {
+.item-row.paid {
   opacity: 0.7;
   background: #e8f5e9;
 }
@@ -462,12 +501,28 @@ onMounted(loadOrder)
   border-radius: 8px;
   overflow: hidden;
   flex-shrink: 0;
+  position: relative;
 }
 
 .item-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.paid-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(103, 194, 58, 0.8);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
 }
 
 .item-info {
@@ -497,6 +552,11 @@ onMounted(loadOrder)
   font-size: 18px;
   font-weight: bold;
   color: #f56c6c;
+}
+
+.item-subtotal.is-paid {
+  color: #67c23a;
+  text-decoration: line-through;
 }
 
 .item-remark {
@@ -539,19 +599,18 @@ onMounted(loadOrder)
 
 .total-section {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  flex-direction: column;
 }
 
 .total-label {
-  font-size: 16px;
+  font-size: 14px;
   color: #606266;
 }
 
 .total-value {
   font-size: 32px;
   font-weight: bold;
-  color: #f56c6c;
+  color: #303133;
 }
 
 .checkout-content {

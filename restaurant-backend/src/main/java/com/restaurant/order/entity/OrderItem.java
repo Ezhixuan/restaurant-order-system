@@ -21,4 +21,5 @@ public class OrderItem extends BaseEntity {
     private BigDecimal subtotal;  // 小计金额
     private String remark;        // 备注
     private Integer status;       // 状态: 0待制作 1制作中 2已完成
+    private Integer isPaid;       // 是否已结账: 0否 1是
 }

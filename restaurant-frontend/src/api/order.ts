@@ -20,6 +20,10 @@ export function addDishToOrder(orderId: number, data: any): Promise<any> {
   return request.post(`/orders/${orderId}/add`, data)
 }
 
+export function batchAddDishToOrder(data: { tableId: number; items: any[] }): Promise<any> {
+  return request.post('/orders/batch-add', data)
+}
+
 export function payOrder(orderId: number, data: any): Promise<any> {
   return request.post(`/orders/${orderId}/pay`, data)
 }
@@ -34,4 +38,8 @@ export function completeOrder(orderId: number): Promise<any> {
 
 export function getOrderByTable(tableId: number): Promise<any> {
   return request.get(`/orders/by-table/${tableId}`)
+}
+
+export function getUnpaidAmount(orderId: number): Promise<number> {
+  return request.get(`/orders/${orderId}/unpaid-amount`)
 }

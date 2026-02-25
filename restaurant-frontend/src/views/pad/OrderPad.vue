@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getDishesByCategory } from '@/api/dish'
-import { createOrder, addDishToOrder, getOrderDetail } from '@/api/order'
+import { createOrder, batchAddDishToOrder, getOrderDetail } from '@/api/order'
 import { useCartStore } from '@/stores/cart'
 
 const route = useRoute()
@@ -16,6 +16,7 @@ const tableId = computed(() => cartStore.tableId || tableIdFromQuery)
 const tableNo = computed(() => cartStore.tableNo || route.query.tableNo as string || '')
 const customerCount = computed(() => cartStore.customerCount || Number(route.query.customerCount) || 1)
 const currentOrderId = ref(Number(route.query.orderId) || 0)
+const isAddMode = computed(() => route.query.mode === 'add' && !!currentOrderId.value)
 
 const categories = ref<any[]>([])
 const activeCategory = ref(0)
@@ -94,33 +95,74 @@ const submitOrder = async () => {
 
   submitting.value = true
   try {
-    const orderData = {
-      tableId: tableId.value,
-      customerCount: customerCount.value,
-      cartItems: cartStore.items.map(item => ({
-        dishId: item.dishId,
-        dishName: item.name,
-        dishImage: item.image,
-        price: item.price,
-        quantity: item.quantity
-      }))
-    }
+    // 加菜模式：向现有订单添加菜品
+    if (isAddMode.value) {
+      const addDishData = {
+        tableId: tableId.value,
+        items: cartStore.items.map(item => ({
+          dishId: item.dishId,
+          quantity: item.quantity,
+          remark: item.remark || ''
+        }))
+      }
 
-    const order = await createOrder(orderData)
-    ElMessage.success('下单成功')
-    cartStore.clearCart()
-    
-    // 跳转到订单详情或返回桌台
-    await ElMessageBox.confirm('下单成功！是否查看订单？', '提示', {
-      confirmButtonText: '查看订单',
-      cancelButtonText: '返回桌台'
-    }).then(() => {
-      router.push('/pad/orders')
-    }).catch(() => {
-      router.push('/pad/tables')
-    })
+      await batchAddDishToOrder(addDishData)
+      ElMessage.success('加菜成功')
+      
+      cartStore.clearCart()
+      
+      // 跳转到订单详情页
+      router.push({
+        path: '/pad/orders',
+        query: { 
+          tableId: tableId.value,
+          tableNo: tableNo.value
+        }
+      })
+    } else {
+      // 新订单模式：创建新订单
+      const orderData = {
+        tableId: tableId.value,
+        customerCount: customerCount.value,
+        cartItems: cartStore.items.map(item => ({
+          dishId: item.dishId,
+          dishName: item.name,
+          dishImage: item.image,
+          price: item.price,
+          quantity: item.quantity
+        }))
+      }
+
+      const order = await createOrder(orderData)
+      ElMessage.success('下单成功')
+      
+      // 保存桌台信息，用于后续跳转
+      const currentTableId = tableId.value
+      const currentTableNo = tableNo.value
+      const currentCustomerCount = customerCount.value
+      
+      cartStore.clearCart()
+      
+      // 跳转到订单详情或返回桌台
+      await ElMessageBox.confirm('下单成功！是否查看订单？', '提示', {
+        confirmButtonText: '查看订单',
+        cancelButtonText: '返回桌台'
+      }).then(() => {
+        // 携带桌台信息跳转到订单列表
+        router.push({
+          path: '/pad/orders',
+          query: { 
+            tableId: currentTableId,
+            tableNo: currentTableNo,
+            customerCount: currentCustomerCount
+          }
+        })
+      }).catch(() => {
+        router.push('/pad/tables')
+      })
+    }
   } catch (error: any) {
-    ElMessage.error(error.message || '下单失败')
+    ElMessage.error(error.message || (isAddMode.value ? '加菜失败' : '下单失败'))
   } finally {
     submitting.value = false
   }
@@ -147,7 +189,10 @@ onMounted(() => {
     <div class="header">
       <div class="header-left">
         <el-button @click="goBack" icon="ArrowLeft">返回</el-button>
-        <span class="table-info">桌号: {{ tableNo }} | 人数: {{ customerCount }}人</span>
+        <span class="table-info">
+          桌号: {{ tableNo }} | 人数: {{ customerCount }}人
+          <el-tag v-if="isAddMode" type="warning" style="margin-left: 10px;">加菜模式</el-tag>
+        </span>
       </div>
       <div class="header-right">
         <el-tag v-if="currentOrder" type="warning">订单号: {{ currentOrder.order?.orderNo }}</el-tag>
@@ -244,7 +289,7 @@ onMounted(() => {
               @click="submitOrder"
               style="width: 100%"
             >
-              提交订单 ({{ cartStore.items.reduce((sum, i) => sum + i.quantity, 0) }})
+              {{ isAddMode ? '确认加菜' : '提交订单' }} ({{ cartStore.items.reduce((sum, i) => sum + i.quantity, 0) }})
             </el-button>
           </div>
         </el-card>

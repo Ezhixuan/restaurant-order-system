@@ -1,17 +1,30 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getActiveOrders, getOrderDetail, addDishToOrder, completeOrder } from '@/api/order'
+import { getActiveOrders, getOrderDetail, addDishToOrder, completeOrder, getOrderByTable } from '@/api/order'
 
+const route = useRoute()
 const router = useRouter()
 const orders = ref<any[]>([])
 const loading = ref(false)
 
+// 从路由参数获取桌台信息
+const queryTableId = computed(() => Number(route.query.tableId) || 0)
+const queryTableNo = computed(() => route.query.tableNo as string || '')
+const queryCustomerCount = computed(() => Number(route.query.customerCount) || 1)
+
 const loadOrders = async () => {
   loading.value = true
   try {
-    orders.value = await getActiveOrders()
+    if (queryTableId.value) {
+      // 有桌台信息，获取该桌台的订单
+      const order = await getOrderByTable(queryTableId.value)
+      orders.value = order ? [order.order] : []
+    } else {
+      // 没有桌台信息，获取所有活跃订单
+      orders.value = await getActiveOrders()
+    }
   } catch (error) {
     ElMessage.error('加载订单失败')
   } finally {
@@ -20,11 +33,12 @@ const loadOrders = async () => {
 }
 
 const showDetail = async (order: any) => {
-  // 可以显示订单详情或跳转到加菜页面
+  // 跳转到加菜页面，携带订单的桌台信息
   router.push({
     path: '/pad/order',
     query: {
       tableId: order.tableId,
+      tableNo: order.tableNo,
       orderId: order.id,
       customerCount: order.customerCount
     }
@@ -61,6 +75,23 @@ const getStatusLabel = (status: number) => {
   return map[status] || '未知'
 }
 
+// 返回桌台或回到点餐页面
+const goBack = () => {
+  // 如果有桌台信息，返回到对应桌台的点餐页面；否则返回桌台列表
+  if (queryTableId.value) {
+    router.push({
+      path: '/pad/order',
+      query: {
+        tableId: queryTableId.value,
+        tableNo: queryTableNo.value,
+        customerCount: queryCustomerCount.value
+      }
+    })
+  } else {
+    router.push('/pad/tables')
+  }
+}
+
 onMounted(loadOrders)
 </script>
 
@@ -68,7 +99,7 @@ onMounted(loadOrders)
   <div class="pad-orders" v-loading="loading">
     <div class="header">
       <h2>订单管理</h2>
-      <el-button type="primary" @click="router.push('/pad/tables')">返回桌台</el-button>
+      <el-button type="primary" @click="goBack">返回桌台</el-button>
     </div>
 
     <el-row :gutter="20">

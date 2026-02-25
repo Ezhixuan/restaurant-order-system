@@ -4,6 +4,7 @@ import com.restaurant.common.Result;
 import com.restaurant.order.dto.*;
 import com.restaurant.order.entity.Order;
 import com.restaurant.order.service.OrderService;
+import com.restaurant.order.service.OrderStatusService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +17,7 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
+    private final OrderStatusService orderStatusService;
 
     @GetMapping
     public Result<List<Order>> list(@RequestParam(required = false) Integer status) {
@@ -40,24 +42,34 @@ public class OrderController {
     @PostMapping("/{orderId}/add")
     public Result<Void> addDish(@PathVariable Long orderId, @RequestBody AddDishRequest request) {
         orderService.addDishToOrder(orderId, request);
+        // 加菜后自动更新订单状态
+        orderStatusService.updateOrderStatus(orderId);
         return Result.success();
     }
 
     @PostMapping("/{orderId}/pay")
     public Result<Void> pay(@PathVariable Long orderId, @RequestBody PayOrderRequest request) {
-        orderService.payOrder(orderId, request);
+        // 使用新的结账逻辑，支持部分结账
+        orderStatusService.checkout(orderId, request.getPayType(), request.getAmount());
         return Result.success();
+    }
+
+    @GetMapping("/{orderId}/unpaid-amount")
+    public Result<BigDecimal> getUnpaidAmount(@PathVariable Long orderId) {
+        return Result.success(orderStatusService.getUnpaidAmount(orderId));
     }
 
     @PostMapping("/items/{itemId}/status")
     public Result<Void> updateItemStatus(@PathVariable Long itemId, @RequestParam Integer status) {
-        orderService.updateItemStatus(itemId, status);
+        // 使用新的状态更新逻辑，自动更新订单状态
+        orderStatusService.updateItemStatus(itemId, status);
         return Result.success();
     }
 
     @PostMapping("/{orderId}/complete")
     public Result<Void> complete(@PathVariable Long orderId) {
-        orderService.completeOrder(orderId);
+        // 使用新的完成逻辑
+        orderStatusService.completeOrder(orderId);
         return Result.success();
     }
 
