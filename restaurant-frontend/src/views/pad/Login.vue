@@ -1,25 +1,43 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { login } from '@/api/auth'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
+
 const form = ref({
   username: '',
   password: ''
 })
+
 const loading = ref(false)
 
 const handleLogin = async () => {
   if (!form.value.username || !form.value.password) {
+    ElMessage.warning('请输入用户名和密码')
     return
   }
+  
   loading.value = true
-  // TODO: 调用登录API
-  setTimeout(() => {
-    localStorage.setItem('token', 'mock_token')
+  try {
+    const res = await login(form.value)
+    authStore.setToken(res.token)
+    authStore.userInfo = {
+      userId: res.userId,
+      username: res.username,
+      realName: res.realName,
+      role: res.role
+    }
+    ElMessage.success('登录成功')
     router.push('/pad/tables')
+  } catch (error: any) {
+    ElMessage.error(error.message || '登录失败')
+  } finally {
     loading.value = false
-  }, 1000)
+  }
 }
 </script>
 
