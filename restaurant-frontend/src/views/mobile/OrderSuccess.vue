@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { showToast, showLoadingToast, closeToast } from 'vant'
 import { useCartStore } from '@/stores/cart'
-import { getOrderByTable, addDishToOrder } from '@/api/order'
+import { getOrderByTable, addDishToOrder, getActiveOrders } from '@/api/order'
 import { getDishes } from '@/api/dish'
 
 const router = useRouter()
@@ -21,7 +21,27 @@ const quantity = ref(1)
 const remark = ref('')
 
 const tableId = ref(Number(route.query.tableId) || cartStore.tableId)
-const tableNo = ref(route.query.tableNo as string || cartStore.tableNo)
+const tableNo = ref((route.query.tableNo as string) || cartStore.tableNo)
+
+// 如果没有桌台信息，尝试从订单列表获取
+const loadTableInfoFromOrder = async () => {
+  if (tableId.value) return
+  
+  // 尝试获取最近的一个活跃订单
+  try {
+    const orders = await getActiveOrders()
+    if (orders && orders.length > 0) {
+      // 使用最新的订单
+      const latestOrder = orders[0]
+      tableId.value = latestOrder.tableId
+      tableNo.value = latestOrder.tableNo
+      // 保存到 store
+      cartStore.setTableInfo(latestOrder.tableId, latestOrder.tableNo, 1)
+    }
+  } catch (e) {
+    console.error('获取订单失败', e)
+  }
+}
 
 // 加载订单详情
 const loadOrder = async () => {
@@ -135,8 +155,9 @@ const totalAmount = computed(() => {
 
 import { computed } from 'vue'
 
-onMounted(() => {
-  loadOrder()
+onMounted(async () => {
+  await loadTableInfoFromOrder()
+  await loadOrder()
 })
 </script>
 

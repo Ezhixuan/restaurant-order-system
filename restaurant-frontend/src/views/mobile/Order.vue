@@ -46,9 +46,21 @@ const submitOrder = async () => {
 
     await createOrder(orderData)
     closeToast()
+    
+    // 保存桌台信息到变量，因为 clearCart 会清除 store
+    const tableId = cartStore.tableId
+    const tableNo = cartStore.tableNo
+    
     cartStore.clearCart()
-    // 跳转到成功页面
-    router.replace('/m/success')
+    
+    // 跳转到成功页面，携带桌台信息
+    router.replace({
+      path: '/m/success',
+      query: {
+        tableId: tableId?.toString(),
+        tableNo: tableNo
+      }
+    })
   } catch (error: any) {
     closeToast()
     showToast(error.message || '下单失败')
