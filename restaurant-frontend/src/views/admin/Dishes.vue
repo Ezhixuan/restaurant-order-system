@@ -135,10 +135,6 @@ const handleSubmitDish = async () => {
   }
 }
 
-const handleImageUpload = (response: any) => {
-  dishForm.value.image = response.data
-}
-
 const getCategoryName = (id: number) => {
   return categories.value.find(c => c.id === id)?.name || '-'
 }
@@ -154,8 +150,7 @@ onMounted(() => {
     <el-tabs v-model="activeTab">
       <!-- 菜品列表 -->
       <el-tab-pane label="菜品管理" name="dishes">
-        <div class="header"
-003e
+        <div class="header">
           <h3>菜品列表</h3>
           <el-button type="primary" @click="handleAddDish">添加菜品</el-button>
         </div>

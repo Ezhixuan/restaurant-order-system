@@ -73,6 +73,4 @@ export const useCartStore = defineStore('cart', () => {
     removeItem,
     clearCart
   }
-}, {
-  persist: true  // 持久化到 localStorage
 })

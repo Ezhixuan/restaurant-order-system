@@ -41,13 +41,14 @@ const handleTableClick = async (table: any) => {
   if (table.status === 0) {
     // 开台
     try {
-      const { value } = await ElMessageBox.prompt('请输入用餐人数', '开台', {
+      const result = await ElMessageBox.prompt('请输入用餐人数', '开台', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         inputPattern: /^[1-9]\d*$/,
         inputErrorMessage: '请输入有效人数',
         inputValue: '2'
       })
+      const value = (result as any).value
       await openTable(table.id, parseInt(value))
       ElMessage.success('开台成功')
       router.push(`/pad/order?tableId=${table.id}&customerCount=${value}`)

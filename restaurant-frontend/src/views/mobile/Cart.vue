@@ -10,20 +10,6 @@ const cartStore = useCartStore()
 const cartItems = computed(() => cartStore.items)
 const totalAmount = computed(() => cartStore.totalAmount)
 
-const updateQuantity = (item: any, delta: number) => {
-  const newQuantity = item.quantity + delta
-  if (newQuantity <= 0) {
-    showConfirmDialog({
-      title: '提示',
-      message: '确定删除该商品吗？'
-    }).then(() => {
-      cartStore.removeItem(item.dishId)
-    }).catch(() => {})
-  } else {
-    cartStore.updateQuantity(item.dishId, newQuantity)
-  }
-}
-
 const clearCart = () => {
   if (cartItems.value.length === 0) return
   showConfirmDialog({

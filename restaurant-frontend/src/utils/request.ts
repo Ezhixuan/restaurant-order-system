@@ -44,4 +44,10 @@ request.interceptors.response.use(
   }
 )
 
-export default request
+// 封装请求方法
+export default {
+  get: <T>(url: string, config?: any): Promise<T> => request.get(url, config) as Promise<T>,
+  post: <T>(url: string, data?: any, config?: any): Promise<T> => request.post(url, data, config) as Promise<T>,
+  put: <T>(url: string, data?: any, config?: any): Promise<T> => request.put(url, data, config) as Promise<T>,
+  delete: <T>(url: string, config?: any): Promise<T> => request.delete(url, config) as Promise<T>
+}
