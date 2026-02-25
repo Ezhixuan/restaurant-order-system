@@ -58,6 +58,27 @@ public class OrderService {
         return dto;
     }
 
+    public OrderDetailDTO getOrderByTable(Long tableId) {
+        // 查询该桌台最新的未完成订单
+        LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Order::getTableId, tableId)
+               .lt(Order::getStatus, 4)  // 未完成（状态 < 4）
+               .orderByDesc(Order::getCreatedAt)
+               .last("LIMIT 1");
+        
+        Order order = orderMapper.selectOne(wrapper);
+        if (order == null) {
+            return null;
+        }
+
+        List<OrderItem> items = orderItemMapper.selectByOrderId(order.getId());
+
+        OrderDetailDTO dto = new OrderDetailDTO();
+        dto.setOrder(order);
+        dto.setItems(items);
+        return dto;
+    }
+
     @Transactional
     public Order createOrder(CreateOrderRequest request) {
         // 检查桌台

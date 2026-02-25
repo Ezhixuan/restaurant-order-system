@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getOrderDetail, updateItemStatus, payOrder, completeOrder, addDishToOrder } from '@/api/order'
+import { getOrderDetail, getOrderByTable, updateItemStatus, payOrder, completeOrder, addDishToOrder } from '@/api/order'
 import { useCartStore } from '@/stores/cart'
 
 const route = useRoute()
@@ -29,21 +29,18 @@ const loadOrder = async () => {
     router.push('/pad/tables')
     return
   }
-  
+
   loading.value = true
   try {
-    // 这里应该通过tableId获取当前桌台的订单
-    // 由于没有这个API，先用活跃订单列表过滤
-    const { getActiveOrders } = await import('@/api/order')
-    const orders = await getActiveOrders()
-    const currentOrder = orders.find((o: any) => o.tableId === tableId.value)
-    
-    if (currentOrder) {
-      const detail = await getOrderDetail(currentOrder.id)
+    // 使用新的 API 根据桌台ID获取订单
+    const detail = await getOrderByTable(tableId.value)
+
+    if (detail) {
       order.value = detail.order
       items.value = detail.items
     } else {
-      ElMessage.warning('该桌台暂无订单')
+      ElMessage.warning('该桌台暂无未完成订单')
+      // 可选：返回桌台列表或显示空状态
     }
   } catch (error) {
     ElMessage.error('加载订单失败')

@@ -67,9 +67,9 @@ public class OrderController {
         return Result.success();
     }
 
-    @GetMapping("/stats/today-revenue")
-    public Result<BigDecimal> getTodayRevenue() {
-        return Result.success(orderService.getTodayRevenue());
+    @GetMapping("/by-table/{tableId}")
+    public Result<OrderDetailDTO> getByTable(@PathVariable Long tableId) {
+        return Result.success(orderService.getOrderByTable(tableId));
     }
 
     @GetMapping("/stats/today-count")
