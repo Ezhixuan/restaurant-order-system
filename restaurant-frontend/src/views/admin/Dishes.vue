@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getCategories, createCategory, updateCategory, deleteCategory, getDishes, createDish, updateDish, deleteDish, toggleDishStatus } from '@/api/dish'
+import type { UploadProps } from 'element-plus'
 
 // 分类管理
 const categories = ref<any[]>([])
@@ -27,6 +28,10 @@ const dishForm = ref({
 })
 
 const activeTab = ref('dishes')
+
+const uploadHeaders = {
+  Authorization: `Bearer ${localStorage.getItem('token') || ''}`
+}
 
 const loadCategories = async () => {
   categories.value = await getCategories()
@@ -139,6 +144,31 @@ const getCategoryName = (id: number) => {
   return categories.value.find(c => c.id === id)?.name || '-'
 }
 
+const handleImageUpload: UploadProps['onSuccess'] = (response) => {
+  if (response.code === 200) {
+    dishForm.value.image = response.data
+    ElMessage.success('图片上传成功')
+  } else {
+    ElMessage.error(response.message || '上传失败')
+  }
+}
+
+const beforeImageUpload: UploadProps['beforeUpload'] = (file) => {
+  const isJPG = file.type === 'image/jpeg'
+  const isPNG = file.type === 'image/png'
+  const isLt2M = file.size / 1024 / 1024 < 2
+
+  if (!isJPG && !isPNG) {
+    ElMessage.error('只支持 JPG/PNG 格式!')
+    return false
+  }
+  if (!isLt2M) {
+    ElMessage.error('图片大小不能超过 2MB!')
+    return false
+  }
+  return true
+}
+
 onMounted(() => {
   loadCategories()
   loadDishes()
@@ -246,6 +276,19 @@ onMounted(() => {
         <el-form-item label="描述">
           <el-input v-model="dishForm.description" type="textarea" rows="3" />
         </el-form-item>
+        <el-form-item label="图片">
+          <el-upload
+            class="avatar-uploader"
+            action="/api/upload/image"
+            :headers="uploadHeaders"
+            :show-file-list="false"
+            :on-success="handleImageUpload"
+            :before-upload="beforeImageUpload"
+          >
+            <img v-if="dishForm.image" :src="dishForm.image" class="avatar" />
+            <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
+          </el-upload>
+        </el-form-item>
         <el-form-item label="推荐">
           <el-switch v-model="dishForm.isRecommend" :active-value="1" :inactive-value="0" />
         </el-form-item>
@@ -274,5 +317,35 @@ onMounted(() => {
   margin-left: 10px;
   color: #909399;
   font-size: 12px;
+}
+
+.avatar-uploader .avatar {
+  width: 178px;
+  height: 178px;
+  display: block;
+}
+
+.avatar-uploader .el-upload {
+  border: 1px dashed var(--el-border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: var(--el-transition-duration-fast);
+}
+
+.avatar-uploader .el-upload:hover {
+  border-color: var(--el-color-primary);
+}
+
+.avatar-uploader-icon {
+  font-size: 28px;
+  color: #8c939d;
+  width: 178px;
+  height: 178px;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 </style>
