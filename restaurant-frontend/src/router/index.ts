@@ -37,6 +37,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/admin/Orders.vue')
   },
   {
+    path: '/admin/kitchen',
+    name: 'Kitchen',
+    component: () => import('@/views/admin/Kitchen.vue')
+  },
+  {
     path: '/admin/reports',
     name: 'AdminReports',
     component: () => import('@/views/admin/Reports.vue')
@@ -61,6 +66,11 @@ const routes: RouteRecordRaw[] = [
     path: '/pad/order',
     name: 'PadOrder',
     component: () => import('@/views/pad/OrderPad.vue')
+  },
+  {
+    path: '/pad/orders',
+    name: 'PadOrders',
+    component: () => import('@/views/pad/Orders.vue')
   },
   // Mobile routes
   {

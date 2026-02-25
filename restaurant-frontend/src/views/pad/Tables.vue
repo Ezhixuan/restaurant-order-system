@@ -3,8 +3,10 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTables, createTable, openTable, clearTable } from '@/api/table'
+import { useCartStore } from '@/stores/cart'
 
 const router = useRouter()
+const cartStore = useCartStore()
 const tables = ref<any[]>([])
 const loading = ref(false)
 
@@ -50,8 +52,12 @@ const handleTableClick = async (table: any) => {
       })
       const value = (result as any).value
       await openTable(table.id, parseInt(value))
+      
+      // 设置购物车桌台信息
+      cartStore.setTableInfo(table.id, table.tableNo, parseInt(value))
+      
       ElMessage.success('开台成功')
-      router.push(`/pad/order?tableId=${table.id}&customerCount=${value}`)
+      router.push('/pad/order')
     } catch (error: any) {
       if (error !== 'cancel') {
         ElMessage.error(error.message || '开台失败')
@@ -59,7 +65,8 @@ const handleTableClick = async (table: any) => {
     }
   } else if (table.status === 1) {
     // 继续点餐
-    router.push(`/pad/order?tableId=${table.id}`)
+    cartStore.setTableInfo(table.id, table.tableNo, 1)
+    router.push('/pad/order')
   } else if (table.status === 2) {
     // 待清台
     try {

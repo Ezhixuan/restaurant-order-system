@@ -45,6 +45,10 @@ const handleLogout = () => {
           <el-icon><Document /></el-icon>
           <span>订单管理</span>
         </el-menu-item>
+        <el-menu-item index="/admin/kitchen">
+          <el-icon><Dish /></el-icon>
+          <span>后厨管理</span>
+        </el-menu-item>
         <el-menu-item index="/admin/reports">
           <el-icon><TrendCharts /></el-icon>
           <span>统计报表</span>

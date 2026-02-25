@@ -14,6 +14,7 @@ export const useCartStore = defineStore('cart', () => {
   // State
   const items = ref<CartItem[]>([])
   const tableNo = ref('')
+  const tableId = ref(0)
   const customerCount = ref(1)
 
   // Getters
@@ -58,12 +59,20 @@ export const useCartStore = defineStore('cart', () => {
   const clearCart = () => {
     items.value = []
     tableNo.value = ''
+    tableId.value = 0
     customerCount.value = 1
+  }
+
+  const setTableInfo = (id: number, no: string, count: number = 1) => {
+    tableId.value = id
+    tableNo.value = no
+    customerCount.value = count
   }
 
   return {
     items,
     tableNo,
+    tableId,
     customerCount,
     totalCount,
     totalAmount,
@@ -71,6 +80,7 @@ export const useCartStore = defineStore('cart', () => {
     updateQuantity,
     updateRemark,
     removeItem,
-    clearCart
+    clearCart,
+    setTableInfo
   }
 })
