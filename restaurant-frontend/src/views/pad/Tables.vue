@@ -142,9 +142,8 @@ const confirmClearTable = async () => {
       }
     }
     
-    // 2. 恢复桌台为空闲状态（需要重新开台才能使用）
-    // 这里可以调用一个专门的恢复空闲接口，或者让后端在清台时自动处理
-    // 暂时通过重新加载桌台列表来刷新状态
+    // 2. 调用清台接口恢复桌台为空闲状态
+    await clearTable(selectedClearTable.value.id)
     
     ElMessage.success('清台成功')
     clearTableDialogVisible.value = false
