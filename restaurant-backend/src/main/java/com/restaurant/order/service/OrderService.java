@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -65,17 +66,10 @@ public class OrderService {
             throw new BusinessException("桌台不存在");
         }
 
-        // 创建订单
-        Order order = new Order();
-        order.setOrderNo(generateOrderNo());
-        order.setTableId(table.getId());
-        order.setTableNo(table.getTableNo());
-        order.setCustomerCount(request.getCustomerCount());
-        order.setStatus(0); // 待支付
-        order.setRemark(request.getRemark());
-
-        // 计算金额
+        // 先计算总金额和准备订单项
         BigDecimal totalAmount = BigDecimal.ZERO;
+        List<OrderItem> items = new ArrayList<>();
+        
         for (CartItemDTO cartItem : request.getCartItems()) {
             Dish dish = dishMapper.selectById(cartItem.getDishId());
             if (dish == null || dish.getStatus() != 1) {
@@ -94,8 +88,8 @@ public class OrderService {
             item.setRemark(cartItem.getRemark());
             item.setSubtotal(dish.getPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity())));
             item.setStatus(0); // 待制作
-
-            orderItemMapper.insert(item);
+            items.add(item);
+            
             totalAmount = totalAmount.add(item.getSubtotal());
 
             // 扣减库存
@@ -105,24 +99,30 @@ public class OrderService {
             }
         }
 
+        // 创建订单
+        Order order = new Order();
+        order.setOrderNo(generateOrderNo());
+        order.setTableId(table.getId());
+        order.setTableNo(table.getTableNo());
+        order.setCustomerCount(request.getCustomerCount());
         order.setTotalAmount(totalAmount);
         order.setDiscountAmount(BigDecimal.ZERO);
         order.setPayAmount(totalAmount);
+        order.setStatus(0); // 待支付
+        order.setRemark(request.getRemark());
 
+        // 先插入订单，获取ID
         orderMapper.insert(order);
+
+        // 再插入订单项（此时有orderId了）
+        for (OrderItem item : items) {
+            item.setOrderId(order.getId());
+            orderItemMapper.insert(item);
+        }
 
         // 更新桌台状态
         table.setStatus(1); // 使用中
         tableMapper.updateById(table);
-
-        // 更新订单项的 orderId
-        LambdaQueryWrapper<OrderItem> wrapper = new LambdaQueryWrapper<>();
-        wrapper.isNull(OrderItem::getOrderId);
-        List<OrderItem> items = orderItemMapper.selectList(wrapper);
-        for (OrderItem item : items) {
-            item.setOrderId(order.getId());
-            orderItemMapper.updateById(item);
-        }
 
         return order;
     }
