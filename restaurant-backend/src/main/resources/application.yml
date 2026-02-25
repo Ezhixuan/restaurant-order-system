@@ -6,6 +6,10 @@ spring:
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.sql.init.SqlInitializationAutoConfiguration
 
 server:
   port: 8080
@@ -38,6 +42,9 @@ spring:
           max-active: 8
           max-idle: 8
           min-idle: 0
+    jpa:
+      repositories:
+        enabled: false
 
 mybatis-plus:
   configuration:
