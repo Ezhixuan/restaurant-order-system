@@ -32,11 +32,19 @@ const checkoutDialogVisible = ref(false)
 const checkoutTable = ref<any>(null)
 const checkoutOrder = ref<any>(null)
 
+// 清台确认对话框
+const clearTableDialogVisible = ref(false)
+const clearTableConfirmVisible = ref(false)
+const selectedClearTable = ref<any>(null)
+
 const loadTables = async () => {
   loading.value = true
   try {
     const res = await getTables()
     tables.value = res || []
+    // 重置清台状态
+    selectedClearTable.value = null
+    clearTableConfirmVisible.value = false
   } catch (error) {
     ElMessage.error('加载桌台失败')
   } finally {
@@ -96,6 +104,60 @@ const handleTableClick = async (table: any) => {
   } else if (table.status === 2) {
     // 待清台 - 显示结账对话框
     handleCheckoutDialog(table)
+  }
+}
+
+// 处理清台
+const handleClearTable = (table: any) => {
+  selectedClearTable.value = table
+  
+  if (clearTableConfirmVisible.value && selectedClearTable.value?.id === table.id) {
+    // 第二次点击，显示确认对话框
+    clearTableDialogVisible.value = true
+  } else {
+    // 第一次点击，进入待确认状态
+    clearTableConfirmVisible.value = true
+    ElMessage.info('请再次点击确认清台')
+    
+    // 3秒后自动重置状态
+    setTimeout(() => {
+      if (selectedClearTable.value?.id === table.id) {
+        clearTableConfirmVisible.value = false
+        selectedClearTable.value = null
+      }
+    }, 3000)
+  }
+}
+
+// 确认清台
+const confirmClearTable = async () => {
+  if (!selectedClearTable.value) return
+  
+  try {
+    // 1. 获取该桌台的所有未完成订单并标记为完成
+    const { getActiveOrders, completeOrder } = await import('@/api/order')
+    const orders = await getActiveOrders()
+    const tableOrders = orders.filter((o: any) => o.tableId === selectedClearTable.value.id && o.status < 3)
+    
+    // 批量完成订单
+    for (const order of tableOrders) {
+      try {
+        await completeOrder(order.id)
+      } catch (e) {
+        console.log('订单可能已完成:', order.id)
+      }
+    }
+    
+    // 2. 调用清台接口
+    await clearTable(selectedClearTable.value.id)
+    
+    ElMessage.success('清台成功')
+    clearTableDialogVisible.value = false
+    clearTableConfirmVisible.value = false
+    selectedClearTable.value = null
+    loadTables()
+  } catch (error: any) {
+    ElMessage.error(error.message || '清台失败')
   }
 }
 
@@ -223,12 +285,22 @@ const submitTempTable = async () => {
 }
 
 const getStatusType = (status: number) => {
-  const map: Record<number, string> = { 0: 'success', 1: 'danger', 2: 'warning' }
+  const map: Record<number, string> = { 
+    0: 'success',   // 空闲
+    1: 'danger',    // 使用中
+    2: 'warning',   // 待清台
+    3: 'info'       // 已完成
+  }
   return map[status] || 'info'
 }
 
 const getStatusLabel = (status: number) => {
-  const map: Record<number, string> = { 0: '空闲', 1: '使用中', 2: '待清台' }
+  const map: Record<number, string> = { 
+    0: '空闲', 
+    1: '使用中', 
+    2: '待清台',
+    3: '已完成'
+  }
   return map[status] || '未知'
 }
 
@@ -338,6 +410,17 @@ onMounted(loadTables)
               临时
             </span>
           </div>
+          
+          <!-- 已完成状态显示清台按钮 -->
+          <div v-if="table.status === 3" class="clear-table-btn">
+            <el-button
+              :type="clearTableConfirmVisible && selectedClearTable?.id === table.id ? 'danger' : 'warning'"
+              size="small"
+              @click.stop="handleClearTable(table)"
+            >
+              {{ clearTableConfirmVisible && selectedClearTable?.id === table.id ? '确认清台' : '清台' }}
+            </el-button>
+          </div>
         </div>
       </div>
       
@@ -441,6 +524,27 @@ onMounted(loadTables)
       <template #footer>
         <el-button @click="tempTableDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="submitTempTable">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 清台确认对话框 -->
+    <el-dialog v-model="clearTableDialogVisible" title="确认清台" width="450px" center>
+      <div class="clear-table-confirm">
+        <el-icon :size="64" color="#e6a23c"><Warning /></el-icon>
+        <div class="confirm-title">确认要清台吗？</div>
+        <div class="confirm-subtitle">{{ selectedClearTable?.name }} ({{ selectedClearTable?.tableNo }})</div>
+        <el-alert
+          title="清台后将完成该桌台所有未结账订单，并将桌台恢复为空闲状态"
+          type="warning"
+          :closable="false"
+          show-icon
+          style="margin-top: 15px; text-align: left;"
+        />
+      </div>
+      
+      <template #footer>
+        <el-button @click="clearTableDialogVisible = false">取消</el-button>
+        <el-button type="danger" size="large" @click="confirmClearTable">确认清台</el-button>
       </template>
     </el-dialog>
   </div>
@@ -598,6 +702,34 @@ onMounted(loadTables)
   gap: 5px;
   font-size: 13px;
   color: #909399;
+}
+
+.clear-table-btn {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.clear-table-btn .el-button {
+  width: 100%;
+}
+
+/* 清台确认对话框 */
+.clear-table-confirm {
+  text-align: center;
+  padding: 20px;
+}
+
+.confirm-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #303133;
+  margin-top: 15px;
+}
+
+.confirm-subtitle {
+  font-size: 14px;
+  color: #909399;
+  margin-top: 5px;
 }
 
 /* 对话框样式 */

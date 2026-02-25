@@ -209,6 +209,7 @@ onMounted(async () => {
             <van-tag :type="getStatusColor(item.status)" size="medium">
               {{ getStatusText(item.status) }}
             </van-tag>
+            <div v-if="item.isPaid" class="paid-badge">已结账</div>
             <div class="item-subtotal">¥{{ item.subtotal }}</div>
           </div>
         </div>
@@ -435,6 +436,15 @@ onMounted(async () => {
   font-weight: bold;
   color: #ee0a24;
   margin-top: 6px;
+}
+
+.paid-badge {
+  font-size: 11px;
+  color: #07c160;
+  background: #e8f5e9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
 }
 
 .bottom-bar {
