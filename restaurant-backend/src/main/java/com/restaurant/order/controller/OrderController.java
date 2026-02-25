@@ -47,6 +47,14 @@ public class OrderController {
         return Result.success();
     }
 
+    @PostMapping("/batch-add")
+    public Result<Order> batchAddDish(@RequestBody BatchAddDishRequest request) {
+        Order order = orderService.batchAddDishToOrder(request);
+        // 加菜后自动更新订单状态
+        orderStatusService.updateOrderStatus(order.getId());
+        return Result.success(order);
+    }
+
     @PostMapping("/{orderId}/pay")
     public Result<Void> pay(@PathVariable Long orderId, @RequestBody PayOrderRequest request) {
         // 使用新的结账逻辑，支持部分结账
