@@ -151,8 +151,14 @@ CREATE TABLE IF NOT EXISTS `payment_setting` (
 -- ============================================
 
 -- 默认管理员账号 (密码: admin123)
+-- 使用BCrypt加密: $2a$10$mciZPeRnfG5ItblWmeBKauVHbCEhWCLna3zEZdbNjabOnpZ8daWqW
 INSERT INTO `sys_user` (`username`, `password`, `real_name`, `role`, `status`) VALUES
-('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EO', '管理员', 2, 1);
+('admin', '$2a$10$mciZPeRnfG5ItblWmeBKauVHbCEhWCLna3zEZdbNjabOnpZ8daWqW', '管理员', 2, 1);
+
+-- 服务员账号 (密码: 123456)
+-- 使用BCrypt加密: $2a$10$mciZPeRnfG5ItblWmeBKauVHbCEhWCLna3zEZdbNjabOnpZ8daWqW
+INSERT INTO `sys_user` (`username`, `password`, `real_name`, `role`, `status`) VALUES
+('waiter', '$2a$10$mciZPeRnfG5ItblWmeBKauVHbCEhWCLna3zEZdbNjabOnpZ8daWqW', '服务员1', 1, 1);
 
 -- 示例固定桌台 (8个卡座 + 2个包厢)
 INSERT INTO `restaurant_table` (`table_no`, `name`, `type`, `capacity`, `status`, `sort_order`) VALUES
