@@ -10,10 +10,11 @@ const route = useRoute()
 const router = useRouter()
 const cartStore = useCartStore()
 
-// 从购物车store获取桌台信息
-const tableId = computed(() => cartStore.tableId)
-const tableNo = computed(() => cartStore.tableNo)
-const customerCount = computed(() => cartStore.customerCount)
+// 从购物车store或route.query获取桌台信息
+const tableIdFromQuery = Number(route.query.tableId) || 0
+const tableId = computed(() => cartStore.tableId || tableIdFromQuery)
+const tableNo = computed(() => cartStore.tableNo || route.query.tableNo as string || '')
+const customerCount = computed(() => cartStore.customerCount || Number(route.query.customerCount) || 1)
 const currentOrderId = ref(Number(route.query.orderId) || 0)
 
 const categories = ref<any[]>([])

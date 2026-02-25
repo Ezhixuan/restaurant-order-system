@@ -125,7 +125,12 @@ const confirmOpenTable = async () => {
     // 跳转到点餐页面（新建订单模式）
     router.push({
       path: '/pad/order',
-      query: { mode: 'new' }
+      query: { 
+        mode: 'new',
+        tableId: selectedTable.value.id,
+        tableNo: selectedTable.value.tableNo,
+        customerCount: customerCount.value
+      }
     })
   } catch (error: any) {
     ElMessage.error(error.message || '开台失败')
@@ -144,7 +149,9 @@ const continueOrder = () => {
     path: '/pad/order',
     query: { 
       mode: 'add',
-      tableId: selectedBusyTable.value.id 
+      tableId: selectedBusyTable.value.id,
+      tableNo: selectedBusyTable.value.tableNo,
+      customerCount: selectedBusyTable.value.capacity
     }
   })
 }
