@@ -72,6 +72,11 @@ const routes: RouteRecordRaw[] = [
     name: 'PadOrders',
     component: () => import('@/views/pad/Orders.vue')
   },
+  {
+    path: '/pad/order-detail',
+    name: 'PadOrderDetail',
+    component: () => import('@/views/pad/OrderDetail.vue')
+  },
   // Mobile routes
   {
     path: '/m/:tableNo',
@@ -89,6 +94,12 @@ const routes: RouteRecordRaw[] = [
     path: '/m/order',
     name: 'MobileOrder',
     component: () => import('@/views/mobile/Order.vue'),
+    meta: { public: true }
+  },
+  {
+    path: '/m/success',
+    name: 'MobileOrderSuccess',
+    component: () => import('@/views/mobile/OrderSuccess.vue'),
     meta: { public: true }
   }
 ]

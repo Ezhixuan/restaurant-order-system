@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTables, createTable, openTable, clearTable } from '@/api/table'
@@ -10,7 +10,12 @@ const cartStore = useCartStore()
 const tables = ref<any[]>([])
 const loading = ref(false)
 
-// 添加临时桌
+// 筛选条件
+const areaFilter = ref('all')
+const statusFilter = ref<number | null>(null)
+const searchKeyword = ref('')
+
+// 添加临时桌对话框
 const tempTableDialogVisible = ref(false)
 const tempTableForm = ref({
   tableNo: '',
@@ -18,10 +23,20 @@ const tempTableForm = ref({
   capacity: 4
 })
 
+// 使用中桌台选择对话框
+const busyTableDialogVisible = ref(false)
+const selectedBusyTable = ref<any>(null)
+
+// 待清台结账对话框
+const checkoutDialogVisible = ref(false)
+const checkoutTable = ref<any>(null)
+const checkoutOrder = ref<any>(null)
+
 const loadTables = async () => {
   loading.value = true
   try {
-    tables.value = await getTables()
+    const res = await getTables()
+    tables.value = res || []
   } catch (error) {
     ElMessage.error('加载桌台失败')
   } finally {
@@ -29,59 +44,152 @@ const loadTables = async () => {
   }
 }
 
-const getStatusType = (status: number) => {
-  const map: Record<number, string> = { 0: 'success', 1: 'danger', 2: 'warning' }
-  return map[status] || 'info'
-}
+// 筛选后的桌台
+const filteredTables = computed(() => {
+  let result = tables.value
+  
+  if (areaFilter.value !== 'all') {
+    if (areaFilter.value === 'fixed') {
+      result = result.filter(t => t.type === 1)
+    } else if (areaFilter.value === 'temp') {
+      result = result.filter(t => t.type === 2)
+    } else if (areaFilter.value === 'vip') {
+      result = result.filter(t => t.tableNo.startsWith('A'))
+    } else if (areaFilter.value === 'hall') {
+      result = result.filter(t => t.tableNo.startsWith('B'))
+    }
+  }
+  
+  if (statusFilter.value !== null) {
+    result = result.filter(t => t.status === statusFilter.value)
+  }
+  
+  if (searchKeyword.value) {
+    const keyword = searchKeyword.value.toLowerCase()
+    result = result.filter(t => 
+      t.tableNo.toLowerCase().includes(keyword) ||
+      t.name.toLowerCase().includes(keyword)
+    )
+  }
+  
+  return result.sort((a, b) => a.sortOrder - b.sortOrder)
+})
 
-const getStatusText = (status: number) => {
-  const map: Record<number, string> = { 0: '空闲', 1: '使用中', 2: '待清台' }
-  return map[status] || '未知'
-}
+// 统计
+const stats = computed(() => {
+  const total = tables.value.length
+  const free = tables.value.filter(t => t.status === 0).length
+  const busy = tables.value.filter(t => t.status === 1).length
+  const pending = tables.value.filter(t => t.status === 2).length
+  return { total, free, busy, pending }
+})
 
+// 点击桌台
 const handleTableClick = async (table: any) => {
   if (table.status === 0) {
-    // 开台
-    try {
-      const result = await ElMessageBox.prompt('请输入用餐人数', '开台', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        inputPattern: /^[1-9]\d*$/,
-        inputErrorMessage: '请输入有效人数',
-        inputValue: '2'
-      })
-      const value = (result as any).value
-      await openTable(table.id, parseInt(value))
-      
-      // 设置购物车桌台信息
-      cartStore.setTableInfo(table.id, table.tableNo, parseInt(value))
-      
-      ElMessage.success('开台成功')
-      router.push('/pad/order')
-    } catch (error: any) {
-      if (error !== 'cancel') {
-        ElMessage.error(error.message || '开台失败')
-      }
-    }
+    // 空闲 - 直接开台
+    handleOpenTableDialog(table)
   } else if (table.status === 1) {
-    // 继续点餐
-    cartStore.setTableInfo(table.id, table.tableNo, 1)
-    router.push('/pad/order')
+    // 使用中 - 显示选项对话框
+    selectedBusyTable.value = table
+    busyTableDialogVisible.value = true
   } else if (table.status === 2) {
-    // 待清台
-    try {
-      await ElMessageBox.confirm('该桌台待清台，是否完成清台？', '提示', { type: 'warning' })
-      await clearTable(table.id)
-      ElMessage.success('清台成功')
-      loadTables()
-    } catch (error: any) {
-      if (error !== 'cancel') {
-        ElMessage.error(error.message || '清台失败')
-      }
-    }
+    // 待清台 - 显示结账对话框
+    handleCheckoutDialog(table)
   }
 }
 
+// 开台对话框
+const openTableDialogVisible = ref(false)
+const selectedTable = ref<any>(null)
+const customerCount = ref(2)
+
+const handleOpenTableDialog = (table: any) => {
+  selectedTable.value = table
+  customerCount.value = table.capacity > 4 ? 4 : table.capacity
+  openTableDialogVisible.value = true
+}
+
+const confirmOpenTable = async () => {
+  if (!selectedTable.value) return
+  try {
+    await openTable(selectedTable.value.id, customerCount.value)
+    
+    // 设置购物车信息
+    cartStore.setTableInfo(selectedTable.value.id, selectedTable.value.tableNo, customerCount.value)
+    cartStore.clearCart() // 清空之前的内容
+    
+    ElMessage.success('开台成功')
+    openTableDialogVisible.value = false
+    
+    // 跳转到点餐页面（新建订单模式）
+    router.push({
+      path: '/pad/order',
+      query: { mode: 'new' }
+    })
+  } catch (error: any) {
+    ElMessage.error(error.message || '开台失败')
+  }
+}
+
+// 继续点餐（加菜）
+const continueOrder = () => {
+  if (!selectedBusyTable.value) return
+  
+  cartStore.setTableInfo(selectedBusyTable.value.id, selectedBusyTable.value.tableNo, 1)
+  cartStore.clearCart()
+  
+  busyTableDialogVisible.value = false
+  router.push({
+    path: '/pad/order',
+    query: { 
+      mode: 'add',
+      tableId: selectedBusyTable.value.id 
+    }
+  })
+}
+
+// 查看订单
+const viewOrder = () => {
+  if (!selectedBusyTable.value) return
+  
+  busyTableDialogVisible.value = false
+  router.push({
+    path: '/pad/order-detail',
+    query: { tableId: selectedBusyTable.value.id }
+  })
+}
+
+// 结账对话框
+const handleCheckoutDialog = async (table: any) => {
+  checkoutTable.value = table
+  checkoutDialogVisible.value = true
+  
+  // 这里应该获取该桌台的订单信息
+  // 为了演示，先用模拟数据
+  checkoutOrder.value = {
+    orderNo: 'ORD20260226001',
+    totalAmount: 256.00,
+    payAmount: 256.00
+  }
+}
+
+// 确认结账
+const confirmCheckout = async () => {
+  try {
+    // 调用清台接口
+    if (checkoutTable.value) {
+      await clearTable(checkoutTable.value.id)
+      ElMessage.success('结账成功，桌台已清台')
+      checkoutDialogVisible.value = false
+      loadTables()
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || '结账失败')
+  }
+}
+
+// 其他原有方法...
 const handleAddTempTable = () => {
   const tempCount = tables.value.filter(t => t.type === 2).length
   tempTableForm.value = {
@@ -107,71 +215,207 @@ const submitTempTable = async () => {
   }
 }
 
+const getStatusType = (status: number) => {
+  const map: Record<number, string> = { 0: 'success', 1: 'danger', 2: 'warning' }
+  return map[status] || 'info'
+}
+
+const getStatusLabel = (status: number) => {
+  const map: Record<number, string> = { 0: '空闲', 1: '使用中', 2: '待清台' }
+  return map[status] || '未知'
+}
+
 onMounted(loadTables)
 </script>
 
 <template>
   <div class="pad-tables" v-loading="loading">
-    <div class="header">
-      <h2>桌台管理</h2>
-      <el-button type="primary" @click="handleAddTempTable">
-        <el-icon><Plus /></el-icon>添加临时桌
-      </el-button>
+    <!-- 统计卡片 -->
+    <el-row :gutter="15" class="stats-row">
+      <el-col :xs="12" :sm="6" :lg="3">
+        <div class="stat-item total">
+          <div class="stat-icon"><el-icon :size="24"><OfficeBuilding /></el-icon></div>
+          <div class="stat-info">
+            <div class="stat-num">{{ stats.total }}</div>
+            <div class="stat-label">总桌台</div>
+          </div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="6" :lg="3">
+        <div class="stat-item free">
+          <div class="stat-icon"><el-icon :size="24"><CircleCheck /></el-icon></div>
+          <div class="stat-info">
+            <div class="stat-num">{{ stats.free }}</div>
+            <div class="stat-label">空闲</div>
+          </div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="6" :lg="3">
+        <div class="stat-item busy">
+          <div class="stat-icon"><el-icon :size="24"><UserFilled /></el-icon></div>
+          <div class="stat-info">
+            <div class="stat-num">{{ stats.busy }}</div>
+            <div class="stat-label">使用中</div>
+          </div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="6" :lg="3">
+        <div class="stat-item pending">
+          <div class="stat-icon"><el-icon :size="24"><Warning /></el-icon></div>
+          <div class="stat-info">
+            <div class="stat-num">{{ stats.pending }}</div>
+            <div class="stat-label">待清台</div>
+          </div>
+        </div>
+      </el-col>
+    </el-row>
+
+    <!-- 筛选栏 -->
+    <el-card class="filter-card" shadow="never">
+      <div class="filter-bar">
+        <div class="filter-left">
+          <el-radio-group v-model="areaFilter" size="large">
+            <el-radio-button label="all">全部</el-radio-button>
+            <el-radio-button label="vip">包厢</el-radio-button>
+            <el-radio-button label="hall">大厅</el-radio-button>
+            <el-radio-button label="fixed">固定座位</el-radio-button>
+            <el-radio-button label="temp">临时座位</el-radio-button>
+          </el-radio-group>
+        </div>
+        
+        <div class="filter-right">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索桌号/名称"
+            clearable
+            style="width: 200px"
+          >
+            <template #prefix><el-icon><Search /></el-icon></template>
+          </el-input>
+          
+          <el-button type="primary" size="large" @click="handleAddTempTable">
+            <el-icon><Plus /></el-icon>添加临时桌
+          </el-button>
+        </div>
+      </div>
+    </el-card>
+
+    <!-- 桌台网格 -->
+    <div class="tables-grid" v-loading="loading">
+      <div
+        v-for="table in filteredTables"
+        :key="table.id"
+        class="table-card"
+        :class="[`status-${table.status}`, { 'temp-table': table.type === 2 }]"
+        @click="handleTableClick(table)"
+      >
+        <div class="table-status-bar" :class="`bg-${getStatusType(table.status)}`"></div>
+        
+        <div class="table-content">
+          <div class="table-header">
+            <span class="table-no">{{ table.tableNo }}</span>
+            <el-tag :type="getStatusType(table.status)" size="small" effect="dark">
+              {{ getStatusLabel(table.status) }}
+            </el-tag>
+          </div>
+          
+          <div class="table-name">{{ table.name }}</div>
+          
+          <div class="table-meta">
+            <span class="meta-item">
+              <el-icon><User /></el-icon>
+              {{ table.capacity }}人
+            </span>
+            <span class="meta-item" v-if="table.type === 2">
+              <el-icon><Timer /></el-icon>
+              临时
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      <el-empty v-if="filteredTables.length === 0" description="暂无桌台数据" style="grid-column: 1/-1;" />
     </div>
-    
-    <el-divider content-position="left">固定卡座</el-divider>
-    
-    <el-row :gutter="20">
-      <el-col
-        v-for="table in tables.filter(t => t.type === 1)"
-        :key="table.id"
-        :xs="12" :sm="8" :md="6"
-        style="margin-bottom: 20px"
-      >
-        <el-card
-          :class="['table-card', { 'table-busy': table.status === 1 }]"
-          shadow="hover"
-          @click="handleTableClick(table)"
-        >
-          <div class="table-header">
-            <span class="table-name">{{ table.name }}</span>
-            <el-tag :type="getStatusType(table.status)" size="small">
-              {{ getStatusText(table.status) }}
-            </el-tag>
-          </div>
-          <div class="table-info">
-            桌号: {{ table.tableNo }} | 容纳: {{ table.capacity }}人
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-    
-    <el-divider content-position="left">临时座位</el-divider>
-    
-    <el-row :gutter="20">
-      <el-col
-        v-for="table in tables.filter(t => t.type === 2)"
-        :key="table.id"
-        :xs="12" :sm="8" :md="6"
-        style="margin-bottom: 20px"
-      >
-        <el-card
-          :class="['table-card', 'temp-table', { 'table-busy': table.status === 1 }]"
-          shadow="hover"
-          @click="handleTableClick(table)"
-        >
-          <div class="table-header">
-            <span class="table-name">{{ table.name }}</span>
-            <el-tag :type="getStatusType(table.status)" size="small">
-              {{ getStatusText(table.status) }}
-            </el-tag>
-          </div>
-          <div class="table-info">
-            桌号: {{ table.tableNo }} | 容纳: {{ table.capacity }}人
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+
+    <!-- 开台对话框 -->
+    <el-dialog v-model="openTableDialogVisible" title="开台" width="400px">
+      <div v-if="selectedTable" class="open-table-info">
+        <div class="info-row">
+          <span class="label">桌台：</span>
+          <span class="value">{{ selectedTable.name }} ({{ selectedTable.tableNo }})</span>
+        </div>
+        <div class="info-row">
+          <span class="label">容量：</span>
+          <span class="value">{{ selectedTable.capacity }}人</span>
+        </div>
+      </div>
+      
+      <el-form label-width="100px" style="margin-top: 20px">
+        <el-form-item label="用餐人数">
+          <el-input-number v-model="customerCount" :min="1" :max="selectedTable?.capacity || 20" size="large" />
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="openTableDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmOpenTable">确认开台</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 使用中桌台选择对话框 -->
+    <el-dialog v-model="busyTableDialogVisible" title="桌台操作中" width="400px">
+      <div v-if="selectedBusyTable" class="busy-table-info">
+        <div class="info-header">
+          <el-icon :size="48" color="#f56c6c"><UserFilled /></el-icon>
+          <div class="info-title">{{ selectedBusyTable.name }}</div>
+          <div class="info-subtitle">{{ selectedBusyTable.tableNo }} · {{ selectedBusyTable.capacity }}人桌</div>
+        </div>
+        
+        <div class="action-buttons">
+          <el-button type="primary" size="large" @click="continueOrder">
+            <el-icon><Plus /></el-icon>
+            继续点餐（加菜）
+          </el-button>
+          
+          <el-button type="success" size="large" @click="viewOrder">
+            <el-icon><Document /></el-icon>
+            查看订单详情
+          </el-button>
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- 结账对话框 -->
+    <el-dialog v-model="checkoutDialogVisible" title="结账" width="450px">
+      <div v-if="checkoutTable && checkoutOrder" class="checkout-info">
+        <div class="checkout-header">
+          <div class="checkout-title">{{ checkoutTable.name }} 账单</div>
+          <div class="checkout-order">订单号：{{ checkoutOrder.orderNo }}</div>
+        </div>
+        
+        <el-divider />
+        
+        <div class="checkout-amount">
+          <div class="amount-label">应收金额</div>
+          <div class="amount-value">¥{{ checkoutOrder.payAmount?.toFixed(2) }}</div>
+        </div>
+        
+        <el-divider />
+        
+        <div class="checkout-actions">
+          <el-alert
+            title="确认收款后，桌台将自动清台"
+            type="warning"
+            :closable="false"
+            style="margin-bottom: 15px"
+          />
+          
+          <el-button type="primary" size="large" style="width: 100%" @click="confirmCheckout">
+            确认收款并清台
+          </el-button>
+        </div>
+      </div>
+    </el-dialog>
 
     <!-- 添加临时桌对话框 -->
     <el-dialog v-model="tempTableDialogVisible" title="添加临时桌" width="400px">
@@ -186,6 +430,7 @@ onMounted(loadTables)
           <el-input-number v-model="tempTableForm.capacity" :min="1" :max="20" />
         </el-form-item>
       </el-form>
+      
       <template #footer>
         <el-button @click="tempTableDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="submitTempTable">确定</el-button>
@@ -197,46 +442,262 @@ onMounted(loadTables)
 <style scoped>
 .pad-tables {
   padding: 20px;
+  background: #f5f7fa;
+  min-height: 100vh;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+/* 统计卡片 */
+.stats-row {
   margin-bottom: 20px;
 }
 
+.stat-item {
+  display: flex;
+  align-items: center;
+  padding: 20px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+}
+
+.stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 15px;
+}
+
+.stat-item.total .stat-icon {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  color: #1976d2;
+}
+
+.stat-item.free .stat-icon {
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  color: #388e3c;
+}
+
+.stat-item.busy .stat-icon {
+  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+  color: #d32f2f;
+}
+
+.stat-item.pending .stat-icon {
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+  color: #f57c00;
+}
+
+.stat-num {
+  font-size: 28px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #909399;
+  margin-top: 5px;
+}
+
+/* 筛选栏 */
+.filter-card {
+  margin-bottom: 20px;
+  border-radius: 12px;
+}
+
+.filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.filter-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+/* 桌台网格 */
+.tables-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+}
+
 .table-card {
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   cursor: pointer;
   transition: all 0.3s;
+  position: relative;
 }
 
 .table-card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
-.table-busy {
-  border: 2px solid #F56C6C;
+.table-card.temp-table {
+  background: linear-gradient(135deg, #fff8e1 0%, #fff 100%);
 }
 
-.temp-table {
-  background: #fdf6ec;
+.table-status-bar {
+  height: 4px;
+  width: 100%;
+}
+
+.bg-success { background: #67c23a; }
+.bg-danger { background: #f56c6c; }
+.bg-warning { background: #e6a23c; }
+
+.table-content {
+  padding: 20px;
 }
 
 .table-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+}
+
+.table-no {
+  font-size: 20px;
+  font-weight: bold;
+  color: #303133;
 }
 
 .table-name {
-  font-size: 18px;
-  font-weight: bold;
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 12px;
 }
 
-.table-info {
+.table-meta {
+  display: flex;
+  gap: 15px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: #909399;
+}
+
+/* 对话框样式 */
+.open-table-info {
+  padding: 15px;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.info-row {
+  display: flex;
+  margin-bottom: 10px;
+}
+
+.info-row .label {
+  color: #909399;
+  width: 60px;
+}
+
+.info-row .value {
+  color: #303133;
+  font-weight: 500;
+}
+
+.busy-table-info {
+  text-align: center;
+}
+
+.info-header {
+  margin-bottom: 30px;
+}
+
+.info-title {
+  font-size: 24px;
+  font-weight: bold;
+  color: #303133;
+  margin-top: 15px;
+}
+
+.info-subtitle {
   font-size: 14px;
   color: #909399;
+  margin-top: 5px;
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.action-buttons .el-button {
+  padding: 20px;
+  font-size: 16px;
+}
+
+.checkout-info {
+  padding: 10px;
+}
+
+.checkout-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.checkout-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.checkout-order {
+  font-size: 14px;
+  color: #909399;
+  margin-top: 5px;
+}
+
+.checkout-amount {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.amount-label {
+  font-size: 14px;
+  color: #909399;
+  margin-bottom: 10px;
+}
+
+.amount-value {
+  font-size: 48px;
+  font-weight: bold;
+  color: #f56c6c;
+}
+
+.checkout-actions {
+  margin-top: 20px;
+}
+
+@media (max-width: 768px) {
+  .tables-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
+  
+  .filter-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

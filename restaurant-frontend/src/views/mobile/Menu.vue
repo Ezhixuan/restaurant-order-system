@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showToast, showLoadingToast, closeToast } from 'vant'
+import { showToast } from 'vant'
 import { getDishesByCategory } from '@/api/dish'
+import { getTables } from '@/api/table'
 import { useCartStore } from '@/stores/cart'
 
 const route = useRoute()
@@ -27,6 +28,19 @@ const loadDishes = async () => {
     showToast('加载菜品失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 获取桌台信息并设置到购物车
+const loadTableInfo = async () => {
+  try {
+    const tables = await getTables()
+    const currentTable = tables.find((t: any) => t.tableNo === tableNo)
+    if (currentTable) {
+      cartStore.setTableInfo(currentTable.id, tableNo, 1)
+    }
+  } catch (error) {
+    console.error('获取桌台信息失败', error)
   }
 }
 
@@ -96,8 +110,7 @@ const clearSearch = () => {
 
 onMounted(() => {
   loadDishes()
-  // 设置当前桌台
-  cartStore.tableNo = tableNo
+  loadTableInfo()
 })
 </script>
 

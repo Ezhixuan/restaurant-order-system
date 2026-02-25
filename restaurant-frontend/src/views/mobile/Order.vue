@@ -21,16 +21,17 @@ const submitOrder = async () => {
     return
   }
 
+  if (!cartStore.tableId) {
+    showToast('桌台信息缺失')
+    return
+  }
+
   submitting.value = true
   showLoadingToast({ message: '提交中...', forbidClick: true })
 
   try {
-    // 这里需要 tableId，从购物车store中获取
-    // 实际应该从路由或store中拿到tableId
-    const tableId = 1 // 临时值，实际需要根据tableNo获取
-
     const orderData = {
-      tableId,
+      tableId: cartStore.tableId,
       customerCount: customerCount.value,
       cartItems: cartItems.map(item => ({
         dishId: item.dishId,
@@ -45,9 +46,9 @@ const submitOrder = async () => {
 
     await createOrder(orderData)
     closeToast()
-    showToast('下单成功')
     cartStore.clearCart()
-    router.push('/m')
+    // 跳转到成功页面
+    router.replace('/m/success')
   } catch (error: any) {
     closeToast()
     showToast(error.message || '下单失败')
