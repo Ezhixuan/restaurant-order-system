@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showToast } from 'vant'
+import { showToast, showLoadingToast, closeToast } from 'vant'
 import { getDishesByCategory } from '@/api/dish'
 import { getTables } from '@/api/table'
+import { getOrderByTable, addDishToOrder, createOrder } from '@/api/order'
 import { useCartStore } from '@/stores/cart'
 
 const route = useRoute()
@@ -17,6 +18,12 @@ const loading = ref(false)
 const searchKeyword = ref('')
 const showSearch = ref(false)
 
+// 桌台和订单信息
+const tableId = ref<number | null>(null)
+const existingOrder = ref<any>(null)
+const checkingOrder = ref(false)
+
+// 加载菜品
 const loadDishes = async () => {
   loading.value = true
   try {
@@ -31,17 +38,53 @@ const loadDishes = async () => {
   }
 }
 
-// 获取桌台信息并设置到购物车
+// 获取桌台信息并检查是否有活跃订单
 const loadTableInfo = async () => {
   try {
     const tables = await getTables()
     const currentTable = tables.find((t: any) => t.tableNo === tableNo)
     if (currentTable) {
+      tableId.value = currentTable.id
       cartStore.setTableInfo(currentTable.id, tableNo, 1)
+      
+      // 检查是否有活跃订单
+      await checkExistingOrder(currentTable.id)
     }
   } catch (error) {
     console.error('获取桌台信息失败', error)
   }
+}
+
+// 检查是否有未完成订单
+const checkExistingOrder = async (tid: number) => {
+  checkingOrder.value = true
+  try {
+    const orderDetail = await getOrderByTable(tid)
+    if (orderDetail && orderDetail.order) {
+      existingOrder.value = orderDetail.order
+    }
+  } catch (error) {
+    // 没有订单是正常的
+    existingOrder.value = null
+  } finally {
+    checkingOrder.value = false
+  }
+}
+
+// 查看订单
+const viewOrder = () => {
+  if (!existingOrder.value || !tableId.value) {
+    showToast('没有可查看的订单')
+    return
+  }
+  
+  router.push({
+    path: '/m/success',
+    query: {
+      tableId: tableId.value.toString(),
+      tableNo: tableNo
+    }
+  })
 }
 
 // 搜索过滤后的菜品
@@ -89,12 +132,77 @@ const addToCart = (dish: any) => {
   showToast('已加入购物车')
 }
 
+// 提交订单（支持追加到现有订单）
+const submitOrder = async () => {
+  if (cartStore.items.length === 0) {
+    showToast('购物车为空')
+    return
+  }
+
+  if (!tableId.value) {
+    showToast('桌台信息缺失')
+    return
+  }
+
+  showLoadingToast({ message: '提交中...', forbidClick: true })
+
+  try {
+    // 检查是否已有未完成订单
+    await checkExistingOrder(tableId.value)
+    
+    if (existingOrder.value && existingOrder.value.status < 4) {
+      // 追加到现有订单
+      for (const item of cartStore.items) {
+        await addDishToOrder(existingOrder.value.id, {
+          dishId: item.dishId,
+          quantity: item.quantity,
+          remark: item.remark || ''
+        })
+      }
+      closeToast()
+      showToast('加菜成功')
+    } else {
+      // 创建新订单
+      const orderData = {
+        tableId: tableId.value,
+        customerCount: cartStore.customerCount || 1,
+        cartItems: cartStore.items.map(item => ({
+          dishId: item.dishId,
+          dishName: item.name,
+          dishImage: item.image,
+          price: item.price,
+          quantity: item.quantity,
+          remark: item.remark || ''
+        })),
+        remark: ''
+      }
+      await createOrder(orderData)
+      closeToast()
+      showToast('下单成功')
+    }
+    
+    // 清空购物车并跳转到成功页面
+    cartStore.clearCart()
+    router.push({
+      path: '/m/success',
+      query: {
+        tableId: tableId.value.toString(),
+        tableNo: tableNo
+      }
+    })
+  } catch (error: any) {
+    closeToast()
+    showToast(error.message || '提交失败')
+  }
+}
+
 const goToCart = () => {
   if (cartStore.items.length === 0) {
     showToast('购物车为空')
     return
   }
-  router.push('/m/cart')
+  // 直接提交订单（在购物车页面或这里都可以）
+  submitOrder()
 }
 
 const onSearch = () => {
@@ -122,6 +230,18 @@ onMounted(() => {
         <span class="table-badge">{{ tableNo }}号桌</span>
       </div>
       <div class="header-right">
+        <!-- 查看订单按钮 -->
+        <van-button
+          v-if="existingOrder"
+          type="success"
+          size="small"
+          round
+          icon="orders-o"
+          @click="viewOrder"
+          style="margin-right: 10px;"
+        >
+          查看订单
+        </van-button>
         <van-icon name="search" size="20" @click="showSearch = true" />
       </div>
     </div>
@@ -218,7 +338,7 @@ onMounted(() => {
 
     <!-- 底部购物车栏 -->
     <div class="cart-bar" v-if="cartCount > 0">
-      <div class="cart-info" @click="goToCart">
+      <div class="cart-info">
         <div class="cart-icon">
           <van-icon name="shopping-cart-o" :badge="cartCount" />
         </div>
@@ -229,9 +349,12 @@ onMounted(() => {
       </div>
       
       <van-button type="primary" round @click="goToCart">
-        去结算
+        {{ existingOrder ? '追加到订单' : '去结算' }}
       </van-button>
     </div>
+    
+    <!-- 空状态提示 -->
+    <van-empty v-if="!loading && categories.length === 0" description="暂无菜品数据" />
   </div>
 </template>
 
@@ -253,6 +376,11 @@ onMounted(() => {
   top: 0;
   z-index: 100;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
 }
 
 .table-badge {
