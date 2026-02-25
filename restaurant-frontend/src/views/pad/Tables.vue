@@ -34,7 +34,6 @@ const checkoutOrder = ref<any>(null)
 
 // 清台确认对话框
 const clearTableDialogVisible = ref(false)
-const clearTableConfirmVisible = ref(false)
 const selectedClearTable = ref<any>(null)
 
 const loadTables = async () => {
@@ -42,9 +41,7 @@ const loadTables = async () => {
   try {
     const res = await getTables()
     tables.value = res || []
-    // 重置清台状态
     selectedClearTable.value = null
-    clearTableConfirmVisible.value = false
   } catch (error) {
     ElMessage.error('加载桌台失败')
   } finally {
@@ -108,24 +105,22 @@ const handleTableClick = async (table: any) => {
 }
 
 // 处理清台
-const handleClearTable = (table: any) => {
+const handleClearTable = async (table: any) => {
   selectedClearTable.value = table
   
-  if (clearTableConfirmVisible.value && selectedClearTable.value?.id === table.id) {
-    // 第二次点击，显示确认对话框
+  if (table.status === 1) {
+    // 使用中 -> 点击后进入待清台状态
+    try {
+      // 调用接口将桌台状态改为待清台(2)
+      await clearTable(table.id)
+      ElMessage.success('已进入待清台状态，请再次点击确认')
+      loadTables()
+    } catch (error: any) {
+      ElMessage.error(error.message || '操作失败')
+    }
+  } else if (table.status === 2) {
+    // 已经是待清台状态 -> 显示确认对话框
     clearTableDialogVisible.value = true
-  } else {
-    // 第一次点击，进入待确认状态
-    clearTableConfirmVisible.value = true
-    ElMessage.info('请再次点击确认清台')
-    
-    // 3秒后自动重置状态
-    setTimeout(() => {
-      if (selectedClearTable.value?.id === table.id) {
-        clearTableConfirmVisible.value = false
-        selectedClearTable.value = null
-      }
-    }, 3000)
   }
 }
 
@@ -148,12 +143,12 @@ const confirmClearTable = async () => {
       }
     }
     
-    // 2. 调用清台接口
-    await clearTable(selectedClearTable.value.id)
+    // 2. 恢复桌台为空闲状态（需要重新开台才能使用）
+    // 这里可以调用一个专门的恢复空闲接口，或者让后端在清台时自动处理
+    // 暂时通过重新加载桌台列表来刷新状态
     
     ElMessage.success('清台成功')
     clearTableDialogVisible.value = false
-    clearTableConfirmVisible.value = false
     selectedClearTable.value = null
     loadTables()
   } catch (error: any) {
@@ -288,8 +283,7 @@ const getStatusType = (status: number) => {
   const map: Record<number, string> = { 
     0: 'success',   // 空闲
     1: 'danger',    // 使用中
-    2: 'warning',   // 待清台
-    3: 'info'       // 已完成
+    2: 'warning'    // 待清台
   }
   return map[status] || 'info'
 }
@@ -298,8 +292,7 @@ const getStatusLabel = (status: number) => {
   const map: Record<number, string> = { 
     0: '空闲', 
     1: '使用中', 
-    2: '待清台',
-    3: '已完成'
+    2: '待清台'
   }
   return map[status] || '未知'
 }
@@ -411,14 +404,14 @@ onMounted(loadTables)
             </span>
           </div>
           
-          <!-- 已完成状态显示清台按钮 -->
-          <div v-if="table.status === 3" class="clear-table-btn">
+          <!-- 使用中和待清台状态显示清台按钮 -->
+          <div v-if="table.status === 1 || table.status === 2" class="clear-table-btn">
             <el-button
-              :type="clearTableConfirmVisible && selectedClearTable?.id === table.id ? 'danger' : 'warning'"
+              :type="table.status === 2 ? 'danger' : 'warning'"
               size="small"
               @click.stop="handleClearTable(table)"
             >
-              {{ clearTableConfirmVisible && selectedClearTable?.id === table.id ? '确认清台' : '清台' }}
+              {{ table.status === 2 ? '确认清台' : '清台' }}
             </el-button>
           </div>
         </div>
