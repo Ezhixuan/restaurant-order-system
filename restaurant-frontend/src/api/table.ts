@@ -23,3 +23,7 @@ export function openTable(id: number, customerCount?: number): Promise<any> {
 export function clearTable(id: number): Promise<any> {
   return request.post(`/tables/${id}/clear`)
 }
+
+export function setPendingClear(id: number): Promise<any> {
+  return request.post(`/tables/${id}/pending-clear`)
+}

@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTables, createTable, openTable, clearTable } from '@/api/table'
+import { getTables, createTable, openTable, clearTable, setPendingClear } from '@/api/table'
 import { useCartStore } from '@/stores/cart'
 
 const router = useRouter()
@@ -109,11 +109,10 @@ const handleClearTable = async (table: any) => {
   selectedClearTable.value = table
   
   if (table.status === 1) {
-    // 使用中 -> 点击后进入待清台状态
+    // 使用中 -> 调用 setPendingClear 进入待清台状态
     try {
-      // 调用接口将桌台状态改为待清台(2)
-      await clearTable(table.id)
-      ElMessage.success('已进入待清台状态，请再次点击确认')
+      await setPendingClear(table.id)
+      ElMessage.success('已进入待清台状态，请再次点击确认清台')
       loadTables()
     } catch (error: any) {
       ElMessage.error(error.message || '操作失败')
