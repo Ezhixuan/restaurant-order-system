@@ -233,7 +233,7 @@ onUnmounted(() => {
 
     <div v-if="sortedOrders.length === 0" class="empty-state">
       <el-empty description="暂无订单">
-        <template #image
+        <template #image>
           <el-icon :size="60" color="#909399"><Coffee /></el-icon>
         </template>
       </el-empty>
