@@ -29,10 +29,17 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                // 移动端公开API - 顾客扫码点餐使用
+                .requestMatchers("/api/dishes/**").permitAll()
+                .requestMatchers("/api/tables/**").permitAll()
+                .requestMatchers("/api/orders/**").permitAll()
+                // 上传文件公开访问
+                .requestMatchers("/uploads/**").permitAll()
+                .requestMatchers("/api/upload/**").authenticated()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-        
+
         return http.build();
     }
 }

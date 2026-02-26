@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS `restaurant_table` (
   `sort_order` INT DEFAULT 0 COMMENT '排序',
   `is_deleted` TINYINT DEFAULT 0 COMMENT '是否删除: 0否 1是',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_table_no` (`table_no`),
   INDEX `idx_type` (`type`),
@@ -59,7 +60,9 @@ CREATE TABLE IF NOT EXISTS `dish_category` (
   `name` VARCHAR(50) NOT NULL COMMENT '分类名称',
   `sort_order` INT DEFAULT 0 COMMENT '排序',
   `status` TINYINT DEFAULT 1 COMMENT '状态: 0禁用 1启用',
+  `is_deleted` TINYINT DEFAULT 0 COMMENT '是否删除: 0否 1是',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   INDEX `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='菜品分类表';
@@ -126,7 +129,9 @@ CREATE TABLE IF NOT EXISTS `order_item` (
   `subtotal` DECIMAL(10,2) NOT NULL COMMENT '小计金额',
   `remark` VARCHAR(200) COMMENT '备注',
   `status` TINYINT DEFAULT 0 COMMENT '状态: 0待制作 1制作中 2已完成',
+  `is_deleted` TINYINT DEFAULT 0 COMMENT '是否删除: 0否 1是',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   INDEX `idx_order_id` (`order_id`),
   INDEX `idx_dish_id` (`dish_id`)
@@ -142,7 +147,9 @@ CREATE TABLE IF NOT EXISTS `payment_setting` (
   `qrcode_image` VARCHAR(255) COMMENT '收款码图片URL',
   `is_default` TINYINT DEFAULT 0 COMMENT '是否默认: 0否 1是',
   `status` TINYINT DEFAULT 1 COMMENT '状态',
+  `is_deleted` TINYINT DEFAULT 0 COMMENT '是否删除: 0否 1是',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='支付设置表';
 

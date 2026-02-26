@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.restaurant.common.exception.BusinessException;
 import com.restaurant.table.dto.CreateTableRequest;
 import com.restaurant.table.dto.UpdateTableRequest;
+import com.restaurant.order.entity.Order;
+import com.restaurant.order.mapper.OrderMapper;
+import com.restaurant.order.service.OrderService;
 import com.restaurant.table.entity.RestaurantTable;
 import com.restaurant.table.mapper.TableMapper;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +19,8 @@ import java.util.List;
 public class TableService {
 
     private final TableMapper tableMapper;
+    private final OrderMapper orderMapper;
+    private final OrderService orderService;
 
     public List<RestaurantTable> listAll() {
         LambdaQueryWrapper<RestaurantTable> wrapper = new LambdaQueryWrapper<>();
@@ -104,6 +109,21 @@ public class TableService {
             throw new BusinessException("桌台不是待清台状态");
         }
         
+        // 查找该桌台下的所有活跃订单（状态小于4的订单）
+        LambdaQueryWrapper<Order> orderWrapper = new LambdaQueryWrapper<>();
+        orderWrapper.eq(Order::getTableId, id)
+                   .lt(Order::getStatus, 4); // 活跃订单：待支付(0)、已支付(1)、制作中(2)、待上菜(3)
+        
+        List<Order> activeOrders = orderMapper.selectList(orderWrapper);
+        
+        // 将所有活跃订单标记为已完成
+        for (Order order : activeOrders) {
+            if (order.getStatus() < 4) { // 只处理未完成的订单
+                orderService.completeOrder(order.getId());
+            }
+        }
+        
+        // 设置桌台为空闲状态
         table.setStatus(0); // 空闲
         tableMapper.updateById(table);
     }

@@ -170,9 +170,10 @@ const confirmOpenTable = async () => {
   try {
     await openTable(selectedTable.value.id, customerCount.value)
     
-    // 设置购物车信息
+    // 先清空购物车，再设置新的桌台信息
+    cartStore.clearCart()
+    // 设置购物车信息（在clearCart之后设置，避免被重置）
     cartStore.setTableInfo(selectedTable.value.id, selectedTable.value.tableNo, customerCount.value)
-    cartStore.clearCart() // 清空之前的内容
     
     ElMessage.success('开台成功')
     openTableDialogVisible.value = false

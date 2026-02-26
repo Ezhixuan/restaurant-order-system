@@ -14,7 +14,14 @@ const cartStore = useCartStore()
 const tableIdFromQuery = Number(route.query.tableId) || 0
 const tableId = computed(() => cartStore.tableId || tableIdFromQuery)
 const tableNo = computed(() => cartStore.tableNo || route.query.tableNo as string || '')
-const customerCount = computed(() => cartStore.customerCount || Number(route.query.customerCount) || 1)
+
+// 顾客人数：优先从query获取（开台时传入），其次从store获取，默认1
+const customerCount = computed(() => {
+  const queryCount = Number(route.query.customerCount)
+  if (queryCount > 0) return queryCount
+  return cartStore.customerCount || 1
+})
+
 const currentOrderId = ref(Number(route.query.orderId) || 0)
 const isAddMode = computed(() => route.query.mode === 'add' && !!currentOrderId.value)
 
@@ -22,6 +29,9 @@ const categories = ref<any[]>([])
 const activeCategory = ref(0)
 const loading = ref(false)
 const submitting = ref(false)
+
+// 订单备注
+const orderRemark = ref('')
 
 // 当前订单详情
 const currentOrder = ref<any>(null)
@@ -78,6 +88,11 @@ const updateQuantity = (dishId: number, quantity: number) => {
   }
 }
 
+// 更新菜品备注
+const updateItemRemark = (dishId: number, remark: string) => {
+  cartStore.updateRemark(dishId, remark)
+}
+
 const cartTotal = computed(() => {
   return cartStore.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 })
@@ -110,6 +125,7 @@ const submitOrder = async () => {
       ElMessage.success('加菜成功')
       
       cartStore.clearCart()
+      orderRemark.value = ''
       
       // 跳转到订单详情页
       router.push({
@@ -129,8 +145,10 @@ const submitOrder = async () => {
           dishName: item.name,
           dishImage: item.image,
           price: item.price,
-          quantity: item.quantity
-        }))
+          quantity: item.quantity,
+          remark: item.remark || ''
+        })),
+        remark: orderRemark.value
       }
 
       const order = await createOrder(orderData)
@@ -142,6 +160,7 @@ const submitOrder = async () => {
       const currentCustomerCount = customerCount.value
       
       cartStore.clearCart()
+      orderRemark.value = ''
       
       // 跳转到订单详情或返回桌台
       await ElMessageBox.confirm('下单成功！是否查看订单？', '提示', {
@@ -270,6 +289,19 @@ onMounted(() => {
                   @click="updateQuantity(item.dishId, item.quantity + 1)"
                 >+</el-button>
               </div>
+            </div>
+            
+            <!-- 订单备注输入框 -->
+            <div class="remark-section">
+              <div class="remark-label">订单备注</div>
+              <el-input
+                v-model="orderRemark"
+                type="textarea"
+                :rows="2"
+                placeholder="请输入订单备注（如：少辣、免葱等）"
+                maxlength="100"
+                show-word-limit
+              />
             </div>
           </div>
 
@@ -467,6 +499,18 @@ onMounted(() => {
   min-width: 30px;
   text-align: center;
   font-weight: bold;
+}
+
+.remark-section {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px dashed #ebeef5;
+}
+
+.remark-label {
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 8px;
 }
 
 .cart-footer {

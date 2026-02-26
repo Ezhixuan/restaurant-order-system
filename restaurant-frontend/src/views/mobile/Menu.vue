@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showToast, showLoadingToast, closeToast } from 'vant'
+import { showToast, showLoadingToast, closeToast, showConfirmDialog } from 'vant'
 import { getDishesByCategory } from '@/api/dish'
 import { getTables } from '@/api/table'
 import { getOrderByTable, addDishToOrder, createOrder } from '@/api/order'
@@ -22,6 +22,14 @@ const showSearch = ref(false)
 const tableId = ref<number | null>(null)
 const existingOrder = ref<any>(null)
 const checkingOrder = ref(false)
+
+// 顾客人数选择弹窗
+const showCustomerDialog = ref(false)
+const tempCustomerCount = ref(1)
+
+// 订单备注
+const orderRemark = ref('')
+const showRemarkDialog = ref(false)
 
 // 加载菜品
 const loadDishes = async () => {
@@ -45,10 +53,15 @@ const loadTableInfo = async () => {
     const currentTable = tables.find((t: any) => t.tableNo === tableNo)
     if (currentTable) {
       tableId.value = currentTable.id
-      cartStore.setTableInfo(currentTable.id, tableNo, 1)
+      cartStore.setTableInfo(currentTable.id, tableNo, cartStore.customerCount || 1)
       
       // 检查是否有活跃订单
       await checkExistingOrder(currentTable.id)
+      
+      // 如果没有活跃订单且是首次进入（customerCount为1），显示人数选择
+      if (!existingOrder.value && cartStore.customerCount === 1) {
+        showCustomerDialog.value = true
+      }
     }
   } catch (error) {
     console.error('获取桌台信息失败', error)
@@ -69,6 +82,19 @@ const checkExistingOrder = async (tid: number) => {
   } finally {
     checkingOrder.value = false
   }
+}
+
+// 确认顾客人数
+const confirmCustomerCount = () => {
+  cartStore.setTableInfo(tableId.value || 0, tableNo, tempCustomerCount.value)
+  showCustomerDialog.value = false
+  showToast(`已设置 ${tempCustomerCount.value} 位用餐`)
+}
+
+// 修改顾客人数
+const changeCustomerCount = () => {
+  tempCustomerCount.value = cartStore.customerCount || 1
+  showCustomerDialog.value = true
 }
 
 // 查看订单
@@ -144,6 +170,13 @@ const submitOrder = async () => {
     return
   }
 
+  // 显示备注弹窗
+  showRemarkDialog.value = true
+}
+
+// 确认提交（带备注）
+const confirmSubmit = async () => {
+  showRemarkDialog.value = false
   showLoadingToast({ message: '提交中...', forbidClick: true })
 
   try {
@@ -174,15 +207,17 @@ const submitOrder = async () => {
           quantity: item.quantity,
           remark: item.remark || ''
         })),
-        remark: ''
+        remark: orderRemark.value
       }
       await createOrder(orderData)
       closeToast()
       showToast('下单成功')
     }
     
-    // 清空购物车并跳转到成功页面
+    // 清空购物车并跳转
     cartStore.clearCart()
+    orderRemark.value = ''
+    
     router.push({
       path: '/m/success',
       query: {
@@ -194,15 +229,6 @@ const submitOrder = async () => {
     closeToast()
     showToast(error.message || '提交失败')
   }
-}
-
-const goToCart = () => {
-  if (cartStore.items.length === 0) {
-    showToast('购物车为空')
-    return
-  }
-  // 直接提交订单（在购物车页面或这里都可以）
-  submitOrder()
 }
 
 const onSearch = () => {
@@ -228,6 +254,9 @@ onMounted(() => {
     <div class="header">
       <div class="header-left">
         <span class="table-badge">{{ tableNo }}号桌</span>
+        <span v-if="!existingOrder" class="customer-count" @click="changeCustomerCount">
+          {{ cartStore.customerCount }}人 <van-icon name="arrow-down" />
+        </span>
       </div>
       <div class="header-right">
         <!-- 查看订单按钮 -->
@@ -338,7 +367,7 @@ onMounted(() => {
 
     <!-- 底部购物车栏 -->
     <div class="cart-bar" v-if="cartCount > 0">
-      <div class="cart-info">
+      <div class="cart-info" @click="submitOrder">
         <div class="cart-icon">
           <van-icon name="shopping-cart-o" :badge="cartCount" />
         </div>
@@ -348,13 +377,47 @@ onMounted(() => {
         </div>
       </div>
       
-      <van-button type="primary" round @click="goToCart">
+      <van-button type="primary" round @click="submitOrder">
         {{ existingOrder ? '追加到订单' : '去结算' }}
       </van-button>
     </div>
     
     <!-- 空状态提示 -->
     <van-empty v-if="!loading && categories.length === 0" description="暂无菜品数据" />
+
+    <!-- 顾客人数选择弹窗 -->
+    <van-dialog
+      v-model:show="showCustomerDialog"
+      title="选择用餐人数"
+      show-cancel-button
+      @confirm="confirmCustomerCount"
+    >
+      <div class="customer-picker">
+        <div class="picker-label">用餐人数</div>
+        <van-stepper v-model="tempCustomerCount" :min="1" :max="50" integer />
+      </div>
+    </van-dialog>
+
+    <!-- 备注输入弹窗 -->
+    <van-dialog
+      v-model:show="showRemarkDialog"
+      title="订单备注"
+      show-cancel-button
+      @confirm="confirmSubmit"
+    >
+      <div class="remark-input">
+        <van-field
+          v-model="orderRemark"
+          rows="3"
+          autosize
+          label=""
+          type="textarea"
+          maxlength="100"
+          placeholder="请输入订单备注（如：少辣、免葱、忌口等）"
+          show-word-limit
+        />
+      </div>
+    </van-dialog>
   </div>
 </template>
 
@@ -378,6 +441,12 @@ onMounted(() => {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .header-right {
   display: flex;
   align-items: center;
@@ -390,6 +459,17 @@ onMounted(() => {
   border-radius: 20px;
   font-size: 14px;
   font-weight: 500;
+}
+
+.customer-count {
+  font-size: 14px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #f5f5f5;
+  border-radius: 12px;
 }
 
 /* 菜品列表 */
@@ -543,6 +623,22 @@ onMounted(() => {
 
 .cart-price .price-num {
   font-size: 24px;
+}
+
+/* 弹窗样式 */
+.customer-picker {
+  padding: 20px;
+  text-align: center;
+}
+
+.picker-label {
+  font-size: 14px;
+  color: #969799;
+  margin-bottom: 15px;
+}
+
+.remark-input {
+  padding: 10px;
 }
 
 :deep(.van-tabs__wrap) {
