@@ -6,6 +6,8 @@ import com.restaurant.order.entity.Order;
 import com.restaurant.order.entity.OrderItem;
 import com.restaurant.order.mapper.OrderItemMapper;
 import com.restaurant.order.mapper.OrderMapper;
+import com.restaurant.table.entity.RestaurantTable;
+import com.restaurant.table.mapper.TableMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ public class OrderStatusService {
 
     private final OrderMapper orderMapper;
     private final OrderItemMapper orderItemMapper;
+    private final TableMapper tableMapper;
 
     /**
      * 根据菜品状态自动更新订单状态
@@ -130,6 +133,13 @@ public class OrderStatusService {
         if (remainingUnpaid.isEmpty()) {
             // 全部结账完成
             order.setStatus(3); // 已完成
+            
+            // 更新桌台状态为待清台
+            RestaurantTable table = tableMapper.selectById(order.getTableId());
+            if (table != null) {
+                table.setStatus(2); // 待清台
+                tableMapper.updateById(table);
+            }
         } else {
             // 还有未结账菜品（追加订单情况）
             order.setStatus(4); // 追加订单
