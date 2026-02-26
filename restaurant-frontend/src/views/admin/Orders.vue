@@ -26,34 +26,31 @@ const currentItems = ref<any[]>([])
 
 const statusOptions = [
   { label: '全部', value: null },
-  { label: '待支付', value: 0 },
-  { label: '已支付', value: 1 },
-  { label: '制作中', value: 2 },
-  { label: '待上菜', value: 3 },
-  { label: '已完成', value: 4 },
-  { label: '已取消', value: 5 }
+  { label: '待上菜', value: 0 },
+  { label: '上菜中', value: 1 },
+  { label: '待结账', value: 2 },
+  { label: '已完成', value: 3 },
+  { label: '已取消', value: 4 }
 ]
 
 const getStatusType = (status: number) => {
   const map: Record<number, string> = {
-    0: 'warning',
-    1: 'success',
-    2: 'primary',
-    3: 'info',
-    4: 'success',
-    5: 'danger'
+    0: 'info',      // 待上菜 - 灰色
+    1: 'warning',   // 上菜中 - 橙色
+    2: 'primary',   // 待结账 - 蓝色
+    3: 'success',   // 已完成 - 绿色
+    4: 'danger'     // 已取消 - 红色
   }
   return map[status] || 'info'
 }
 
 const getStatusLabel = (status: number) => {
   const map: Record<number, string> = {
-    0: '待支付',
-    1: '已支付',
-    2: '制作中',
-    3: '待上菜',
-    4: '已完成',
-    5: '已取消'
+    0: '待上菜',
+    1: '上菜中',
+    2: '待结账',
+    3: '已完成',
+    4: '已取消'
   }
   return map[status] || '未知'
 }
@@ -233,20 +230,12 @@ onMounted(() => {
           <template #default="{ row }">
             <el-button size="small" @click="showDetail(row)">详情</el-button>
             <el-button
-              v-if="row.status === 0"
+              v-if="row.status === 2"
               size="small"
               type="success"
               @click="handlePay(row)"
             >
               收款
-            </el-button>
-            <el-button
-              v-if="row.status === 3"
-              size="small"
-              type="primary"
-              @click="handleComplete(row)"
-            >
-              完成
             </el-button>
             <el-button
               v-if="row.status < 2"

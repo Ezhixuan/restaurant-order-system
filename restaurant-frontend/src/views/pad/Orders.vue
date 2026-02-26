@@ -237,11 +237,11 @@ const goBack = () => {
 // 获取状态样式
 const getStatusType = (status: number) => {
   const map: Record<number, string> = {
-    0: 'info',
-    1: 'warning',
-    2: 'success',
-    3: 'success',
-    4: 'danger'
+    0: 'info',      // 待上菜
+    1: 'warning',   // 上菜中
+    2: 'primary',   // 待结账
+    3: 'success',   // 已完成
+    4: 'danger'     // 已取消
   }
   return map[status] || 'info'
 }
@@ -252,7 +252,7 @@ const getStatusLabel = (status: number) => {
     1: '上菜中',
     2: '待结账',
     3: '已完成',
-    4: '追加订单'
+    4: '已取消'
   }
   return map[status] || '未知'
 }
@@ -510,8 +510,8 @@ onMounted(loadOrders)
                     {{ getItemStatusLabel(item.status) }}
                   </el-tag>
                   
-                  <!-- 状态操作按钮 -->
-                  <div v-if="!item.isPaid" class="status-actions">
+                  <!-- 状态操作按钮 - 根据菜品状态显示，不再限制已结账 -->
+                  <div v-if="item.status < 2" class="status-actions">
                     <el-button
                       v-if="item.status === 0"
                       type="warning"

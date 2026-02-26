@@ -101,9 +101,9 @@ const getOrderStatusType = (status: number) => {
   const map: Record<number, string> = {
     0: 'info',      // 待上菜
     1: 'warning',   // 上菜中
-    2: 'success',   // 待结账
+    2: 'primary',   // 待结账
     3: 'success',   // 已完成
-    4: 'danger'     // 追加订单
+    4: 'danger'     // 已取消
   }
   return map[status] || 'info'
 }
@@ -114,7 +114,7 @@ const getOrderStatusLabel = (status: number) => {
     1: '上菜中',
     2: '待结账',
     3: '已完成',
-    4: '追加订单'
+    4: '已取消'
   }
   return map[status] || '未知'
 }
@@ -302,7 +302,7 @@ onMounted(loadOrder)
             </div>
 
             <div class="item-actions">
-              <el-button-group v-if="!item.isPaid">
+              <el-button-group v-if="item.status < 2">
                 <el-button
                   v-if="item.status === 0"
                   type="warning"
@@ -319,17 +319,9 @@ onMounted(loadOrder)
                 >
                   制作完成
                 </el-button>
-                <el-button
-                  v-if="item.status === 2"
-                  type="primary"
-                  size="small"
-                  disabled
-                >
-                  已完成
-                </el-button>
               </el-button-group>
 
-              <div v-else class="completed-text">✓ 已结账</div>
+              <div v-if="item.status === 2" class="completed-text">✓ 制作完成</div>
             </div>
           </div>
         </div>

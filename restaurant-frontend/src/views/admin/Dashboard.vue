@@ -96,24 +96,22 @@ const initRevenueChart = () => {
 
 const getStatusType = (status: number) => {
   const map: Record<number, string> = {
-    0: 'warning',
-    1: 'success',
-    2: 'primary',
-    3: 'info',
-    4: 'success',
-    5: 'danger'
+    0: 'info',      // 待上菜
+    1: 'warning',   // 上菜中
+    2: 'primary',   // 待结账
+    3: 'success',   // 已完成
+    4: 'danger'     // 已取消
   }
   return map[status] || 'info'
 }
 
 const getStatusLabel = (status: number) => {
   const map: Record<number, string> = {
-    0: '待支付',
-    1: '已支付',
-    2: '制作中',
-    3: '待上菜',
-    4: '已完成',
-    5: '已取消'
+    0: '待上菜',
+    1: '上菜中',
+    2: '待结账',
+    3: '已完成',
+    4: '已取消'
   }
   return map[status] || '未知'
 }
