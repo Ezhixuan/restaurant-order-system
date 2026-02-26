@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getCategories, createCategory, updateCategory, deleteCategory, getDishes, createDish, updateDish, deleteDish, toggleDishStatus } from '@/api/dish'
+import { getCategories, createCategory, updateCategory, deleteCategory, getDishesByCategory, createDish, updateDish, deleteDish, toggleDishStatus } from '@/api/dish'
 import type { UploadProps } from 'element-plus'
 
 // 分类管理
@@ -40,7 +40,14 @@ const loadCategories = async () => {
 const loadDishes = async () => {
   loading.value = true
   try {
-    dishes.value = await getDishes()
+    const data = await getDishesByCategory()
+    // 扁平化菜品列表
+    dishes.value = data.flatMap((cat: any) =>
+      (cat.dishes || []).map((dish: any) => ({
+        ...dish,
+        categoryId: cat.id
+      }))
+    )
   } finally {
     loading.value = false
   }
@@ -190,8 +197,31 @@ onMounted(() => {
           <el-table-column prop="categoryId" label="分类" width="120">
             <template #default="{ row }">{{ getCategoryName(row.categoryId) }}</template>
           </el-table-column>
-          <el-table-column prop="price" label="价格" width="100">
-            <template #default="{ row }">¥{{ row.price }}</template>
+          <el-table-column prop="price" label="价格" width="140">
+            <template #default="{ row }">
+              <template v-if="row.hasSpecs === 1 && row.specs?.length > 0">
+                <el-tooltip placement="top">
+                  <template #content>
+                    <div v-for="spec in row.specs" :key="spec.id">
+                      {{ spec.name }}: ¥{{ spec.price }}
+                    </div>
+                  </template>
+                  <span class="spec-price">
+                    ¥{{ Math.min(...row.specs.map(s => s.price)) }} ~ 
+                    ¥{{ Math.max(...row.specs.map(s => s.price)) }}
+                  </span>
+                </el-tooltip>
+              </template>
+              <template v-else>
+                ¥{{ row.price }}
+              </template>
+            </template>
+          </el-table-column>
+          <el-table-column label="规格" width="100">
+            <template #default="{ row }">
+              <el-tag v-if="row.hasSpecs === 1" type="primary" size="small">多规格</el-tag>
+              <span v-else class="text-gray">-</span>
+            </template>
           </el-table-column>
           <el-table-column prop="stock" label="库存" width="80" />
           <el-table-column prop="isRecommend" label="推荐" width="80">
@@ -317,6 +347,16 @@ onMounted(() => {
   margin-left: 10px;
   color: #909399;
   font-size: 12px;
+}
+
+.spec-price {
+  color: #409eff;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.text-gray {
+  color: #c0c4cc;
 }
 
 .avatar-uploader .avatar {

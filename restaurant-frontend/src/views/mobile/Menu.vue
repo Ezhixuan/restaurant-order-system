@@ -1,18 +1,18 @@
-<script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+<script setup lang="ts">import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast, showLoadingToast, closeToast, showConfirmDialog } from 'vant'
 import { getDishesByCategory } from '@/api/dish'
 import { getTables } from '@/api/table'
 import { getOrderByTable, addDishToOrder, createOrder } from '@/api/order'
 import { useCartStore } from '@/stores/cart'
+import type { SpecItem } from '@/api/dishSpec'
 
 const route = useRoute()
 const router = useRouter()
 const cartStore = useCartStore()
 
 const tableNo = route.params.tableNo as string
-const categories = ref<any[]>([])
+categories.value = []
 const activeCategory = ref(0)
 const loading = ref(false)
 const searchKeyword = ref('')
@@ -31,11 +31,18 @@ const tempCustomerCount = ref(1)
 const orderRemark = ref('')
 const showRemarkDialog = ref(false)
 
+// 规格选择弹窗
+const showSpecDialog = ref(false)
+const currentDish = ref<any>(null)
+const selectedSpec = ref<SpecItem | null>(null)
+const specQuantity = ref(1)
+
 // 加载菜品
 const loadDishes = async () => {
   loading.value = true
   try {
-    categories.value = await getDishesByCategory()
+    const data = await getDishesByCategory()
+    categories.value = data
     if (categories.value.length > 0) {
       activeCategory.value = categories.value[0].id
     }
@@ -147,6 +154,21 @@ const cartTotal = computed(() => {
   return cartStore.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 })
 
+// 点击菜品
+const handleDishClick = (dish: any) => {
+  if (dish.hasSpecs === 1 && dish.specs?.length > 0) {
+    // 需要选择规格
+    currentDish.value = dish
+    selectedSpec.value = dish.specs[0]
+    specQuantity.value = 1
+    showSpecDialog.value = true
+  } else {
+    // 直接加入购物车
+    addToCart(dish)
+  }
+}
+
+// 直接添加到购物车（无规格）
 const addToCart = (dish: any) => {
   cartStore.addItem({
     dishId: dish.id,
@@ -158,7 +180,25 @@ const addToCart = (dish: any) => {
   showToast('已加入购物车')
 }
 
-// 提交订单（支持追加到现有订单）
+// 添加规格商品到购物车
+const addSpecToCart = () => {
+  if (!currentDish.value || !selectedSpec.value) return
+  
+  cartStore.addItem({
+    dishId: currentDish.value.id,
+    specId: selectedSpec.value.id,
+    name: currentDish.value.name,
+    specName: selectedSpec.value.name,
+    price: selectedSpec.value.price,
+    image: currentDish.value.image,
+    quantity: specQuantity.value
+  })
+  
+  showSpecDialog.value = false
+  showToast(`已添加 ${currentDish.value.name} (${selectedSpec.value.name})`)
+}
+
+// 提交订单
 const submitOrder = async () => {
   if (cartStore.items.length === 0) {
     showToast('购物车为空')
@@ -170,18 +210,16 @@ const submitOrder = async () => {
     return
   }
 
-  // 显示备注弹窗
   showRemarkDialog.value = true
 }
 
-// 确认提交（带备注）
+// 确认提交
 const confirmSubmit = async () => {
   showRemarkDialog.value = false
   showLoadingToast({ message: '提交中...', forbidClick: true })
 
   try {
-    // 检查是否已有未完成订单
-    await checkExistingOrder(tableId.value)
+    await checkExistingOrder(tableId.value!)
     
     if (existingOrder.value && existingOrder.value.status < 4) {
       // 追加到现有订单
@@ -201,7 +239,9 @@ const confirmSubmit = async () => {
         customerCount: cartStore.customerCount || 1,
         cartItems: cartStore.items.map(item => ({
           dishId: item.dishId,
+          specId: item.specId,
           dishName: item.name,
+          specName: item.specName,
           dishImage: item.image,
           price: item.price,
           quantity: item.quantity,
@@ -214,14 +254,13 @@ const confirmSubmit = async () => {
       showToast('下单成功')
     }
     
-    // 清空购物车并跳转
     cartStore.clearCart()
     orderRemark.value = ''
     
     router.push({
       path: '/m/success',
       query: {
-        tableId: tableId.value.toString(),
+        tableId: tableId.value!.toString(),
         tableNo: tableNo
       }
     })
@@ -259,7 +298,6 @@ onMounted(() => {
         </span>
       </div>
       <div class="header-right">
-        <!-- 查看订单按钮 -->
         <van-button
           v-if="existingOrder"
           type="success"
@@ -300,11 +338,12 @@ onMounted(() => {
               v-for="dish in category.dishes"
               :key="dish.id"
               class="dish-card"
-              @click="addToCart(dish)"
+              @click="handleDishClick(dish)"
             >
               <div class="dish-image">
                 <img :src="dish.image || 'https://img.yzcdn.cn/vant/ipad.jpeg'" />
                 <div v-if="dish.isRecommend" class="recommend-badge">推荐</div>
+                <div v-if="dish.hasSpecs === 1" class="spec-badge">多规格</div>
               </div>
               
               <div class="dish-info">
@@ -313,7 +352,10 @@ onMounted(() => {
                 <div class="dish-bottom">
                   <div class="dish-price">
                     <span class="price-symbol">¥</span>
-                    <span class="price-num">{{ dish.price }}</span>
+                    <span v-if="dish.hasSpecs === 1 && dish.specs?.length > 0" class="price-num">
+                      {{ Math.min(...dish.specs.map((s: any) => s.price)) }}起
+                    </span>
+                    <span v-else class="price-num">{{ dish.price }}</span>
                   </div>
                   <div class="add-btn">
                     <van-icon name="plus" />
@@ -339,7 +381,7 @@ onMounted(() => {
           v-for="dish in filteredDishes"
           :key="dish.id"
           class="dish-card"
-          @click="addToCart(dish)"
+          @click="handleDishClick(dish)"
         >
           <div class="dish-image">
             <img :src="dish.image || 'https://img.yzcdn.cn/vant/ipad.jpeg'" />
@@ -398,6 +440,41 @@ onMounted(() => {
       </div>
     </van-dialog>
 
+    <!-- 规格选择弹窗 -->
+    <van-dialog
+      v-model:show="showSpecDialog"
+      :title="currentDish?.name"
+      show-cancel-button
+      @confirm="addSpecToCart"
+    >
+      <div class="spec-picker">
+        <div class="picker-label">选择规格</div>
+        <div class="spec-options">
+          <van-radio-group v-model="selectedSpec">
+            <van-cell-group inset>
+              <van-cell
+                v-for="spec in currentDish?.specs"
+                :key="spec.id"
+                clickable
+                @click="selectedSpec = spec"
+              >
+                <template #title>
+                  <span class="spec-name">{{ spec.name }}</span>
+                  <span class="spec-price">¥{{ spec.price }}</span>
+                </template>
+                <template #right-icon>
+                  <van-radio :name="spec" />
+                </template>
+              </van-cell>
+            </van-cell-group>
+          </van-radio-group>
+        </div>
+        
+        <div class="picker-label" style="margin-top: 15px;">数量</div>
+        <van-stepper v-model="specQuantity" :min="1" :max="99" />
+      </div>
+    </van-dialog>
+
     <!-- 备注输入弹窗 -->
     <van-dialog
       v-model:show="showRemarkDialog"
@@ -428,7 +505,6 @@ onMounted(() => {
   padding-bottom: 80px;
 }
 
-/* 顶部导航 */
 .header {
   display: flex;
   justify-content: space-between;
@@ -445,11 +521,6 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
 }
 
 .table-badge {
@@ -472,7 +543,6 @@ onMounted(() => {
   border-radius: 12px;
 }
 
-/* 菜品列表 */
 .dish-list {
   padding: 12px;
 }
@@ -510,6 +580,17 @@ onMounted(() => {
   border-radius: 0 0 10px 0;
 }
 
+.spec-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: linear-gradient(135deg, #1989fa, #39b9fa);
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 0 0 0 10px;
+}
+
 .dish-info {
   flex: 1;
   padding: 12px;
@@ -537,12 +618,6 @@ onMounted(() => {
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-.dish-category {
-  font-size: 12px;
-  color: #1989fa;
-  margin-top: 4px;
 }
 
 .dish-bottom {
@@ -578,7 +653,6 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(25, 137, 250, 0.3);
 }
 
-/* 搜索结果 */
 .search-results {
   padding: 12px;
 }
@@ -590,7 +664,6 @@ onMounted(() => {
   padding: 0 4px;
 }
 
-/* 购物车栏 */
 .cart-bar {
   position: fixed;
   bottom: 0;
@@ -625,10 +698,10 @@ onMounted(() => {
   font-size: 24px;
 }
 
-/* 弹窗样式 */
-.customer-picker {
+.customer-picker,
+.spec-picker,
+.remark-input {
   padding: 20px;
-  text-align: center;
 }
 
 .picker-label {
@@ -637,8 +710,17 @@ onMounted(() => {
   margin-bottom: 15px;
 }
 
-.remark-input {
-  padding: 10px;
+.spec-options {
+  margin-bottom: 15px;
+}
+
+.spec-name {
+  margin-right: 10px;
+}
+
+.spec-price {
+  color: #f44;
+  font-weight: 600;
 }
 
 :deep(.van-tabs__wrap) {

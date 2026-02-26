@@ -281,7 +281,12 @@ onMounted(() => {
 
         <!-- 订单明细 -->
         <el-table :data="currentItems" border size="small">
-          <el-table-column prop="dishName" label="菜品" />
+          <el-table-column prop="dishName" label="菜品">
+          <template #default="{ row }">
+            {{ row.dishName }}
+            <el-tag v-if="row.specName" type="info" size="small">{{ row.specName }}</el-tag>
+          </template>
+        </el-table-column>
           <el-table-column prop="price" label="单价" width="100">
             <template #default="{ row }">¥{{ row.price?.toFixed(2) }}</template>
           </el-table-column>

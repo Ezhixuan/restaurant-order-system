@@ -246,7 +246,10 @@ onMounted(loadOrder)
               </div>
               
               <div class="item-info">
-                <div class="item-name">{{ item.dishName }}</div>
+                <div class="item-name">
+                  {{ item.dishName }}
+                  <el-tag v-if="item.specName" type="info" size="small">{{ item.specName }}</el-tag>
+                </div>
                 <div class="item-meta">
                   <span class="item-price">¥{{ item.price?.toFixed(2) }} x {{ item.quantity }}</span>
                   <span class="item-subtotal" :class="{ 'is-paid': item.isPaid }">¥{{ item.subtotal?.toFixed(2) }}</span>
