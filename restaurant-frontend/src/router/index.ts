@@ -77,6 +77,11 @@ const routes: RouteRecordRaw[] = [
     name: 'PadOrderDetail',
     component: () => import('@/views/pad/OrderDetail.vue')
   },
+  {
+    path: '/pad/dishes',
+    name: 'PadDishManagement',
+    component: () => import('@/views/pad/DishManagement.vue')
+  },
   // Mobile routes
   {
     path: '/m/:tableNo',

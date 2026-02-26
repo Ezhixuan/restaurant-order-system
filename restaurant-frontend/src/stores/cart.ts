@@ -3,7 +3,9 @@ import { ref, computed } from 'vue'
 
 export interface CartItem {
   dishId: number
-  name: string
+  specId?: number       // 规格ID(可选)
+  name: string          // 菜品名称
+  specName?: string     // 规格名称
   price: number
   image?: string
   quantity: number
@@ -23,34 +25,53 @@ export const useCartStore = defineStore('cart', () => {
 
   // Actions
   const addItem = (item: CartItem) => {
-    const existing = items.value.find(i => i.dishId === item.dishId)
-    if (existing) {
-      existing.quantity += item.quantity
+    // 检查是否已存在相同菜品+规格
+    const key = item.specId ? `${item.dishId}-${item.specId}` : `${item.dishId}`
+    const existingIndex = items.value.findIndex(i => {
+      const existingKey = i.specId ? `${i.dishId}-${i.specId}` : `${i.dishId}`
+      return existingKey === key
+    })
+    
+    if (existingIndex > -1) {
+      items.value[existingIndex].quantity += item.quantity
     } else {
       items.value.push({ ...item })
     }
   }
 
-  const updateQuantity = (dishId: number, quantity: number) => {
-    const item = items.value.find(i => i.dishId === dishId)
-    if (item) {
+  const updateQuantity = (dishId: number, quantity: number, specId?: number) => {
+    const key = specId ? `${dishId}-${specId}` : `${dishId}`
+    const index = items.value.findIndex(i => {
+      const existingKey = i.specId ? `${i.dishId}-${i.specId}` : `${i.dishId}`
+      return existingKey === key
+    })
+    
+    if (index > -1) {
       if (quantity <= 0) {
-        removeItem(dishId)
+        items.value.splice(index, 1)
       } else {
-        item.quantity = quantity
+        items.value[index].quantity = quantity
       }
     }
   }
 
-  const updateRemark = (dishId: number, remark: string) => {
-    const item = items.value.find(i => i.dishId === dishId)
+  const updateRemark = (dishId: number, remark: string, specId?: number) => {
+    const key = specId ? `${dishId}-${specId}` : `${dishId}`
+    const item = items.value.find(i => {
+      const existingKey = i.specId ? `${i.dishId}-${i.specId}` : `${i.dishId}`
+      return existingKey === key
+    })
     if (item) {
       item.remark = remark
     }
   }
 
-  const removeItem = (dishId: number) => {
-    const index = items.value.findIndex(i => i.dishId === dishId)
+  const removeItem = (dishId: number, specId?: number) => {
+    const key = specId ? `${dishId}-${specId}` : `${dishId}`
+    const index = items.value.findIndex(i => {
+      const existingKey = i.specId ? `${i.dishId}-${i.specId}` : `${i.dishId}`
+      return existingKey === key
+    })
     if (index > -1) {
       items.value.splice(index, 1)
     }

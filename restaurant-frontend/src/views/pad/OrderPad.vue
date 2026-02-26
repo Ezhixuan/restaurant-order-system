@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getDishesByCategory } from '@/api/dish'
 import { createOrder, batchAddDishToOrder, getOrderDetail } from '@/api/order'
 import { useCartStore } from '@/stores/cart'
+import type { SpecItem } from '@/api/dishSpec'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,7 +16,7 @@ const tableIdFromQuery = Number(route.query.tableId) || 0
 const tableId = computed(() => cartStore.tableId || tableIdFromQuery)
 const tableNo = computed(() => cartStore.tableNo || route.query.tableNo as string || '')
 
-// 顾客人数：优先从query获取（开台时传入），其次从store获取，默认1
+// 顾客人数
 const customerCount = computed(() => {
   const queryCount = Number(route.query.customerCount)
   if (queryCount > 0) return queryCount
@@ -35,6 +36,13 @@ const orderRemark = ref('')
 
 // 当前订单详情
 const currentOrder = ref<any>(null)
+
+// 规格选择弹窗
+const specDialogVisible = ref(false)
+const currentDish = ref<any>(null)
+const selectedSpec = ref<SpecItem | null>(null)
+const specQuantity = ref(1)
+const specRemark = ref('')
 
 const loadDishes = async () => {
   loading.value = true
@@ -65,6 +73,41 @@ const currentDishes = computed(() => {
   return category?.dishes || []
 })
 
+// 点击菜品 - 检查是否需要选择规格
+const handleDishClick = (dish: any) => {
+  if (dish.hasSpecs === 1 && dish.specs?.length > 0) {
+    // 需要选择规格
+    currentDish.value = dish
+    selectedSpec.value = dish.specs[0] // 默认选中第一个
+    specQuantity.value = 1
+    specRemark.value = ''
+    specDialogVisible.value = true
+  } else {
+    // 直接加入购物车
+    addToCart(dish)
+  }
+}
+
+// 添加规格商品到购物车
+const addSpecToCart = () => {
+  if (!currentDish.value || !selectedSpec.value) return
+  
+  cartStore.addItem({
+    dishId: currentDish.value.id,
+    specId: selectedSpec.value.id,
+    name: currentDish.value.name,
+    specName: selectedSpec.value.name,
+    price: selectedSpec.value.price,
+    image: currentDish.value.image,
+    quantity: specQuantity.value,
+    remark: specRemark.value
+  })
+  
+  specDialogVisible.value = false
+  ElMessage.success(`已添加 ${currentDish.value.name} (${selectedSpec.value.name})`)
+}
+
+// 直接添加到购物车（无规格）
 const addToCart = (dish: any) => {
   cartStore.addItem({
     dishId: dish.id,
@@ -76,21 +119,16 @@ const addToCart = (dish: any) => {
   ElMessage.success(`已添加 ${dish.name}`)
 }
 
-const removeFromCart = (dishId: number) => {
-  cartStore.removeItem(dishId)
+const removeFromCart = (dishId: number, specId?: number) => {
+  cartStore.removeItem(dishId, specId)
 }
 
-const updateQuantity = (dishId: number, quantity: number) => {
+const updateQuantity = (dishId: number, quantity: number, specId?: number) => {
   if (quantity <= 0) {
-    cartStore.removeItem(dishId)
+    cartStore.removeItem(dishId, specId)
   } else {
-    cartStore.updateQuantity(dishId, quantity)
+    cartStore.updateQuantity(dishId, quantity, specId)
   }
-}
-
-// 更新菜品备注
-const updateItemRemark = (dishId: number, remark: string) => {
-  cartStore.updateRemark(dishId, remark)
 }
 
 const cartTotal = computed(() => {
@@ -110,7 +148,7 @@ const submitOrder = async () => {
 
   submitting.value = true
   try {
-    // 加菜模式：向现有订单添加菜品
+    // 加菜模式
     if (isAddMode.value) {
       const addDishData = {
         tableId: tableId.value,
@@ -127,7 +165,6 @@ const submitOrder = async () => {
       cartStore.clearCart()
       orderRemark.value = ''
       
-      // 跳转到订单详情页
       router.push({
         path: '/pad/orders',
         query: { 
@@ -136,13 +173,15 @@ const submitOrder = async () => {
         }
       })
     } else {
-      // 新订单模式：创建新订单
+      // 新订单模式
       const orderData = {
         tableId: tableId.value,
         customerCount: customerCount.value,
         cartItems: cartStore.items.map(item => ({
           dishId: item.dishId,
+          specId: item.specId,
           dishName: item.name,
+          specName: item.specName,
           dishImage: item.image,
           price: item.price,
           quantity: item.quantity,
@@ -154,26 +193,21 @@ const submitOrder = async () => {
       const order = await createOrder(orderData)
       ElMessage.success('下单成功')
       
-      // 保存桌台信息，用于后续跳转
       const currentTableId = tableId.value
       const currentTableNo = tableNo.value
-      const currentCustomerCount = customerCount.value
       
       cartStore.clearCart()
       orderRemark.value = ''
       
-      // 跳转到订单详情或返回桌台
       await ElMessageBox.confirm('下单成功！是否查看订单？', '提示', {
         confirmButtonText: '查看订单',
         cancelButtonText: '返回桌台'
       }).then(() => {
-        // 携带桌台信息跳转到订单列表
         router.push({
           path: '/pad/orders',
           query: { 
             tableId: currentTableId,
-            tableNo: currentTableNo,
-            customerCount: currentCustomerCount
+            tableNo: currentTableNo
           }
         })
       }).catch(() => {
@@ -221,7 +255,6 @@ onMounted(() => {
     <div class="main-content">
       <!-- 左侧菜品区 -->
       <div class="dishes-area">
-        <!-- 分类标签 -->
         <el-tabs v-model="activeCategory" type="border-card" class="category-tabs">
           <el-tab-pane
             v-for="category in categories"
@@ -235,15 +268,23 @@ onMounted(() => {
                 :key="dish.id"
                 class="dish-card"
                 shadow="hover"
-                @click="addToCart(dish)"
+                @click="handleDishClick(dish)"
               >
                 <div class="dish-image">
                   <img :src="dish.image || 'https://img.yzcdn.cn/vant/ipad.jpeg'" :alt="dish.name" />
                   <el-tag v-if="dish.isRecommend" type="danger" class="recommend-tag">推荐</el-tag>
+                  <el-tag v-if="dish.hasSpecs === 1" type="primary" class="spec-tag">多规格</el-tag>
                 </div>
                 <div class="dish-info">
                   <div class="dish-name">{{ dish.name }}</div>
-                  <div class="dish-price">¥{{ dish.price.toFixed(2) }}</div>
+                  <div class="dish-price">
+                    <template v-if="dish.hasSpecs === 1 && dish.specs?.length > 0">
+                      ¥{{ Math.min(...dish.specs.map((s: any) => s.price)).toFixed(0) }} 起
+                    </template>
+                    <template v-else>
+                      ¥{{ dish.price.toFixed(2) }}
+                    </template>
+                  </div>
                 </div>
               </el-card>
             </div>
@@ -271,27 +312,30 @@ onMounted(() => {
 
           <!-- 购物车列表 -->
           <div v-if="cartStore.items.length > 0" class="cart-list">
-            <div v-for="item in cartStore.items" :key="item.dishId" class="cart-item">
+            <div v-for="item in cartStore.items" :key="item.dishId + '-' + (item.specId || 0)" class="cart-item">
               <div class="item-info">
-                <div class="item-name">{{ item.name }}</div>
+                <div class="item-name">
+                  {{ item.name }}
+                  <el-tag v-if="item.specName" size="small" type="info">{{ item.specName }}</el-tag>
+                </div>
                 <div class="item-price">¥{{ item.price.toFixed(2) }}</div>
               </div>
               <div class="item-actions">
                 <el-button
                   size="small"
                   circle
-                  @click="updateQuantity(item.dishId, item.quantity - 1)"
+                  @click="updateQuantity(item.dishId, item.quantity - 1, item.specId)"
                 >-</el-button>
                 <span class="quantity">{{ item.quantity }}</span>
                 <el-button
                   size="small"
                   circle
-                  @click="updateQuantity(item.dishId, item.quantity + 1)"
+                  @click="updateQuantity(item.dishId, item.quantity + 1, item.specId)"
                 >+</el-button>
               </div>
             </div>
             
-            <!-- 订单备注输入框 -->
+            <!-- 订单备注 -->
             <div class="remark-section">
               <div class="remark-label">订单备注</div>
               <el-input
@@ -327,6 +371,65 @@ onMounted(() => {
         </el-card>
       </div>
     </div>
+
+    <!-- 规格选择弹窗 -->
+    <el-dialog
+      v-model="specDialogVisible"
+      :title="currentDish?.name"
+      width="400px"
+    >
+      <div v-if="currentDish" class="spec-dialog-content">
+        <div class="spec-section">
+          <div class="section-label">选择规格</div>
+          <div class="spec-options">
+            <el-radio-group v-model="selectedSpec">
+              <el-radio-button
+                v-for="spec in currentDish.specs"
+                :key="spec.id"
+                :label="spec"
+              >
+                {{ spec.name }} ¥{{ spec.price.toFixed(0) }}
+              </el-radio-button>
+            </el-radio-group>
+          </div>
+        </div>
+
+        <div class="quantity-section">
+          <div class="section-label">数量</div>
+          <el-input-number v-model="specQuantity" :min="1" :max="99" />
+        </div>
+
+        <div class="remark-section">
+          <div class="section-label">备注</div>
+          <el-input
+            v-model="specRemark"
+            placeholder="口味要求等"
+            maxlength="50"
+          />
+        </div>
+
+        <div class="spec-summary" v-if="selectedSpec">
+          <div class="summary-row">
+            <span>单价: ¥{{ selectedSpec.price.toFixed(2) }}</span>
+            <span>× {{ specQuantity }}</span>
+          </div>
+          <div class="summary-total">
+            小计: ¥{{ (selectedSpec.price * specQuantity).toFixed(2) }}
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="specDialogVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :disabled="!selectedSpec"
+          @click="addSpecToCart"
+        >
+          加入购物车
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -415,6 +518,12 @@ onMounted(() => {
   left: 5px;
 }
 
+.spec-tag {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+}
+
 .dish-info {
   padding: 10px;
   text-align: center;
@@ -482,6 +591,9 @@ onMounted(() => {
   font-size: 14px;
   color: #303133;
   margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .item-price {
@@ -529,6 +641,50 @@ onMounted(() => {
 
 .total-price {
   font-size: 24px;
+  color: #f56c6c;
+  font-weight: bold;
+}
+
+/* 规格弹窗 */
+.spec-dialog-content {
+  padding: 10px 0;
+}
+
+.spec-section,
+.quantity-section,
+.remark-section {
+  margin-bottom: 20px;
+}
+
+.section-label {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 10px;
+}
+
+.spec-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.spec-summary {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  color: #606266;
+}
+
+.summary-total {
+  text-align: right;
+  font-size: 18px;
   color: #f56c6c;
   font-weight: bold;
 }
