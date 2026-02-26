@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { getActiveOrders, getOrderDetail, completeOrder, getOrderByTable, getUnpaidAmount } from '@/api/order'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getActiveOrders, getOrderDetail, updateItemStatus, payOrder, getOrderByTable, getUnpaidAmount } from '@/api/order'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +15,12 @@ const selectedOrder = ref<any>(null)
 const selectedItems = ref<any[]>([])
 const selectedUnpaidAmount = ref(0)
 const detailLoading = ref(false)
+
+// 活跃订单滑动视图
+const showAllOrders = ref(false)
+const currentOrderIndex = ref(0)
+const allOrders = ref<any[]>([])
+const allOrdersLoading = ref(false)
 
 // 结账对话框
 const checkoutVisible = ref(false)
@@ -48,6 +54,74 @@ const loadOrders = async () => {
   }
 }
 
+// 加载所有活跃订单（用于滑动视图）
+const loadAllActiveOrders = async () => {
+  allOrdersLoading.value = true
+  try {
+    const ordersList = await getActiveOrders()
+    // 获取每个订单的详情（包含菜品）
+    const ordersWithDetails = await Promise.all(
+      ordersList.map(async (order: any) => {
+        try {
+          const detail = await getOrderDetail(order.id)
+          return {
+            ...order,
+            items: detail?.items || [],
+            unpaidAmount: detail?.items?.filter((i: any) => !i.isPaid).reduce((sum: number, i: any) => sum + (i.subtotal || 0), 0) || 0
+          }
+        } catch (e) {
+          return { ...order, items: [], unpaidAmount: 0 }
+        }
+      })
+    )
+    allOrders.value = ordersWithDetails
+    currentOrderIndex.value = 0
+  } catch (error) {
+    ElMessage.error('加载活跃订单失败')
+  } finally {
+    allOrdersLoading.value = false
+  }
+}
+
+// 打开所有订单滑动视图
+const openAllOrdersView = async () => {
+  await loadAllActiveOrders()
+  if (allOrders.value.length === 0) {
+    ElMessage.info('暂无活跃订单')
+    return
+  }
+  showAllOrders.value = true
+}
+
+// 切换订单
+const prevOrder = () => {
+  if (currentOrderIndex.value > 0) {
+    currentOrderIndex.value--
+  }
+}
+
+const nextOrder = () => {
+  if (currentOrderIndex.value < allOrders.value.length - 1) {
+    currentOrderIndex.value++
+  }
+}
+
+// 更新菜品状态
+const handleUpdateItemStatus = async (item: any, newStatus: number) => {
+  try {
+    await updateItemStatus(item.id, newStatus)
+    ElMessage.success('状态更新成功')
+    // 刷新当前订单数据
+    await loadAllActiveOrders()
+    // 保持当前索引
+    if (currentOrderIndex.value >= allOrders.value.length) {
+      currentOrderIndex.value = Math.max(0, allOrders.value.length - 1)
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || '操作失败')
+  }
+}
+
 // 点击订单卡片 - 显示详情
 const handleCardClick = async (order: any) => {
   detailLoading.value = true
@@ -55,15 +129,12 @@ const handleCardClick = async (order: any) => {
   selectedOrder.value = order
   
   try {
-    // 获取订单详情（包含菜品）
     const detail = await getOrderDetail(order.id)
     if (detail) {
       selectedItems.value = detail.items || []
-      // 获取未结账金额
       try {
         selectedUnpaidAmount.value = await getUnpaidAmount(order.id)
       } catch (e) {
-        // 手动计算
         selectedUnpaidAmount.value = selectedItems.value
           .filter((item: any) => !item.isPaid)
           .reduce((sum: number, item: any) => sum + (item.subtotal || 0), 0)
@@ -78,16 +149,18 @@ const handleCardClick = async (order: any) => {
 
 // 跳转到加菜页面
 const showAddDish = () => {
-  if (!selectedOrder.value) return
+  const order = allOrders.value[currentOrderIndex.value] || selectedOrder.value
+  if (!order) return
   
+  showAllOrders.value = false
   detailVisible.value = false
   router.push({
     path: '/pad/order',
     query: {
-      tableId: selectedOrder.value.tableId,
-      tableNo: selectedOrder.value.tableNo,
-      orderId: selectedOrder.value.id,
-      customerCount: selectedOrder.value.customerCount,
+      tableId: order.tableId,
+      tableNo: order.tableNo,
+      orderId: order.id,
+      customerCount: order.customerCount,
       mode: 'add'
     }
   })
@@ -95,52 +168,51 @@ const showAddDish = () => {
 
 // 打开结账对话框
 const openCheckout = () => {
-  if (!selectedOrder.value) return
-  if (selectedUnpaidAmount.value <= 0) {
+  const order = allOrders.value[currentOrderIndex.value]
+  if (!order) return
+  if (order.unpaidAmount <= 0) {
     ElMessage.warning('没有待结账的金额')
     return
   }
+  selectedOrder.value = order
+  selectedUnpaidAmount.value = order.unpaidAmount
   checkoutVisible.value = true
 }
 
 // 确认结账
 const confirmCheckout = async () => {
-  if (!selectedOrder.value) return
+  const order = allOrders.value[currentOrderIndex.value] || selectedOrder.value
+  if (!order) return
   
   try {
-    const { payOrder } = await import('@/api/order')
-    await payOrder(selectedOrder.value.id, {
+    await payOrder(order.id, {
       payType: payType.value,
-      amount: selectedUnpaidAmount.value
+      amount: order.unpaidAmount || selectedUnpaidAmount.value
     })
     
     ElMessage.success('结账成功')
     checkoutVisible.value = false
-    detailVisible.value = false
-    loadOrders() // 刷新列表
+    showAllOrders.value = false
+    await loadOrders()
+    await loadAllActiveOrders()
   } catch (error: any) {
     ElMessage.error(error.message || '结账失败')
   }
 }
 
-// 获取菜品状态样式
-const getItemStatusType = (status: number) => {
-  const map: Record<number, string> = { 0: 'info', 1: 'warning', 2: 'success' }
-  return map[status] || 'info'
+// 返回
+const goBack = () => {
+  router.push('/pad/tables')
 }
 
-const getItemStatusLabel = (status: number) => {
-  const map: Record<number, string> = { 0: '待制作', 1: '制作中', 2: '已完成' }
-  return map[status] || '未知'
-}
-
+// 获取状态样式
 const getStatusType = (status: number) => {
   const map: Record<number, string> = {
-    0: 'info',      // 待上菜
-    1: 'warning',   // 上菜中
-    2: 'success',   // 待结账
-    3: 'success',   // 已完成
-    4: 'danger'     // 追加订单
+    0: 'info',
+    1: 'warning',
+    2: 'success',
+    3: 'success',
+    4: 'danger'
   }
   return map[status] || 'info'
 }
@@ -156,20 +228,14 @@ const getStatusLabel = (status: number) => {
   return map[status] || '未知'
 }
 
-// 返回桌台或回到点餐页面
-const goBack = () => {
-  if (queryTableId.value) {
-    router.push({
-      path: '/pad/order',
-      query: {
-        tableId: queryTableId.value,
-        tableNo: queryTableNo.value,
-        customerCount: queryCustomerCount.value
-      }
-    })
-  } else {
-    router.push('/pad/tables')
-  }
+const getItemStatusType = (status: number) => {
+  const map: Record<number, string> = { 0: 'info', 1: 'warning', 2: 'success' }
+  return map[status] || 'info'
+}
+
+const getItemStatusLabel = (status: number) => {
+  const map: Record<number, string> = { 0: '待制作', 1: '制作中', 2: '已完成' }
+  return map[status] || '未知'
 }
 
 onMounted(loadOrders)
@@ -177,11 +243,19 @@ onMounted(loadOrders)
 
 <template>
   <div class="pad-orders" v-loading="loading">
+    <!-- 顶部导航 -->
     <div class="header">
       <h2>订单管理</h2>
-      <el-button type="primary" @click="goBack">返回桌台</el-button>
+      <div class="header-actions">
+        <el-button type="success" size="large" @click="openAllOrdersView">
+          <el-icon><View /></el-icon>
+          查看所有活跃订单
+        </el-button>
+        <el-button @click="goBack">返回桌台</el-button>
+      </div>
     </div>
 
+    <!-- 订单卡片网格 -->
     <el-row :gutter="20">
       <el-col
         v-for="order in orders"
@@ -215,97 +289,148 @@ onMounted(loadOrders)
 
     <el-empty v-if="orders.length === 0" description="暂无进行中的订单" />
 
-    <!-- 订单详情对话框 -->
+    <!-- 所有活跃订单滑动视图 -->
     <el-dialog
-      v-model="detailVisible"
-      :title="`${selectedOrder?.tableNo}号桌 - 订单详情`"
-      width="600px"
+      v-model="showAllOrders"
+      title="活跃订单管理"
+      width="90%"
       :close-on-click-modal="false"
+      class="orders-slider-dialog"
     >
-      <div v-loading="detailLoading">
-        <div v-if="selectedOrder" class="detail-header">
-          <div class="detail-info">
-            <span>订单号: {{ selectedOrder.orderNo }}</span>
-            <el-tag :type="getStatusType(selectedOrder.status)" effect="dark">
-              {{ getStatusLabel(selectedOrder.status) }}
-            </el-tag>
-          </div>
-          <div class="detail-meta">
-            <span>人数: {{ selectedOrder.customerCount }}人</span>
-            <span>下单时间: {{ new Date(selectedOrder.createdAt).toLocaleString() }}</span>
-          </div>
+      <div v-loading="allOrdersLoading" class="orders-slider-container">
+        <!-- 订单指示器 -->
+        <div class="order-indicator">
+          <span class="current-index">{{ currentOrderIndex + 1 }}</span>
+          <span class="total">/ {{ allOrders.length }}</span>
+          <span class="table-info" v-if="allOrders[currentOrderIndex]">
+            {{ allOrders[currentOrderIndex].tableNo }}号桌
+          </span>
         </div>
 
-        <el-divider />
-
-        <!-- 菜品列表 -->
-        <div class="items-list">
-          <h4>菜品清单 ({{ selectedItems.length }}道)</h4>
+        <!-- 滑动控制按钮 -->
+        <div class="slider-controls">
+          <el-button
+            circle
+            size="large"
+            :disabled="currentOrderIndex === 0"
+            @click="prevOrder"
+          >
+            <el-icon><ArrowLeft /></el-icon>
+          </el-button>
           
-          <div v-if="selectedItems.length > 0" class="items-container">
-            <div
-              v-for="item in selectedItems"
-              :key="item.id"
-              class="item-row"
-              :class="{ 'is-paid': item.isPaid }"
-            >
-              <div class="item-info">
-                <div class="item-name">
-                  {{ item.dishName }}
-                  <el-tag v-if="item.isPaid" type="success" size="small">已结账</el-tag>
+          <el-button
+            circle
+            size="large"
+            :disabled="currentOrderIndex === allOrders.length - 1"
+            @click="nextOrder"
+          >
+            <el-icon><ArrowRight /></el-icon>
+          </el-button>
+        </div>
+
+        <!-- 当前订单详情 -->
+        <div v-if="allOrders[currentOrderIndex]" class="current-order">
+          <el-card class="order-detail-card">
+            <template #header>
+              <div class="detail-header">
+                <div class="header-left">
+                  <h3>{{ allOrders[currentOrderIndex].tableNo }}号桌</h3>
+                  <el-tag :type="getStatusType(allOrders[currentOrderIndex].status)" effect="dark">
+                    {{ getStatusLabel(allOrders[currentOrderIndex].status) }}
+                  </el-tag>
                 </div>
-                <div class="item-meta">
-                  <span>¥{{ item.price?.toFixed(2) }} x {{ item.quantity }}</span>
-                  <span class="item-subtotal">¥{{ item.subtotal?.toFixed(2) }}</span>
-                </div>
-                <div v-if="item.remark" class="item-remark">
-                  备注: {{ item.remark }}
+                <div class="header-right">
+                  <div class="order-meta">
+                    <span>{{ allOrders[currentOrderIndex].customerCount }}人用餐</span>
+                    <span>{{ allOrders[currentOrderIndex].items?.length || 0 }}道菜</span>
+                  </div>
                 </div>
               </div>
-              <div class="item-status">
-                <el-tag :type="getItemStatusType(item.status)" size="small">
-                  {{ getItemStatusLabel(item.status) }}
-                </el-tag>
+            </template>
+
+            <!-- 菜品列表 -->
+            <div class="items-list">
+              <h4>菜品清单</h4>
+              <div
+                v-for="item in allOrders[currentOrderIndex].items"
+                :key="item.id"
+                class="item-row"
+                :class="{ 'is-paid': item.isPaid }"
+              >
+                <div class="item-info">
+                  <div class="item-name">
+                    {{ item.dishName }}
+                    <el-tag v-if="item.isPaid" type="success" size="small">已结账</el-tag>
+                  </div>
+                  <div class="item-meta">
+                    <span>¥{{ item.price?.toFixed(2) }} x {{ item.quantity }}</span>
+                    <span class="item-subtotal">¥{{ item.subtotal?.toFixed(2) }}</span>
+                  </div>
+                  <div v-if="item.remark" class="item-remark">备注: {{ item.remark }}</div>
+                </div>
+                
+                <div class="item-status-section">
+                  <el-tag :type="getItemStatusType(item.status)" size="small">
+                    {{ getItemStatusLabel(item.status) }}
+                  </el-tag>
+                  
+                  <!-- 状态操作按钮 -->
+                  <div v-if="!item.isPaid" class="status-actions">
+                    <el-button
+                      v-if="item.status === 0"
+                      type="warning"
+                      size="small"
+                      @click="handleUpdateItemStatus(item, 1)"
+                    >
+                      开始制作
+                    </el-button>
+                    <el-button
+                      v-if="item.status === 1"
+                      type="success"
+                      size="small"
+                      @click="handleUpdateItemStatus(item, 2)"
+                    >
+                      制作完成
+                    </el-button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-          
-          <el-empty v-else description="暂无菜品" />
+
+            <!-- 金额信息 -->
+            <div class="amount-section">
+              <div class="amount-row">
+                <span>总计金额:</span>
+                <span class="amount-value">¥{{ allOrders[currentOrderIndex].payAmount?.toFixed(2) }}</span>
+              </div>
+              <div v-if="allOrders[currentOrderIndex].unpaidAmount > 0" class="amount-row unpaid">
+                <span>未结账金额:</span>
+                <span class="amount-value text-danger">¥{{ allOrders[currentOrderIndex].unpaidAmount.toFixed(2) }}</span>
+              </div>
+            </div>
+          </el-card>
         </div>
 
-        <el-divider />
-
-        <!-- 金额信息 -->
-        <div class="amount-section">
-          <div class="amount-row">
-            <span>总计金额:</span>
-            <span class="amount-value">¥{{ selectedOrder?.payAmount?.toFixed(2) }}</span>
-          </div>
-          <div v-if="selectedUnpaidAmount !== selectedOrder?.payAmount" class="amount-row unpaid">
-            <span>未结账金额:</span>
-            <span class="amount-value text-danger">¥{{ selectedUnpaidAmount.toFixed(2) }}</span>
-          </div>
+        <!-- 底部操作栏 -->
+        <div class="slider-actions">
+          <el-button @click="showAllOrders = false">关闭</el-button>
+          <el-button type="primary" @click="showAddDish">
+            <el-icon><Plus /></el-icon>加菜
+          </el-button>
+          <el-button
+            v-if="allOrders[currentOrderIndex]?.unpaidAmount > 0"
+            type="success"
+            @click="openCheckout"
+          >
+            结账 (¥{{ allOrders[currentOrderIndex].unpaidAmount.toFixed(2) }})
+          </el-button>
         </div>
       </div>
-
-      <template #footer>
-        <el-button @click="detailVisible = false">关闭</el-button>
-        <el-button type="primary" @click="showAddDish">
-          <el-icon><Plus /></el-icon>加菜
-        </el-button>
-        <el-button
-          v-if="selectedUnpaidAmount > 0"
-          type="success"
-          @click="openCheckout"
-        >
-          结账 (¥{{ selectedUnpaidAmount.toFixed(2) }})
-        </el-button>
-      </template>
     </el-dialog>
 
     <!-- 结账对话框 -->
     <el-dialog v-model="checkoutVisible" title="确认结账" width="450px">
-      <div v-if="selectedOrder" class="checkout-content">
+      <div class="checkout-content">
         <div class="checkout-amount">
           <div class="amount-label">应收金额</div>
           <div class="amount-value">¥{{ selectedUnpaidAmount.toFixed(2) }}</div>
@@ -354,6 +479,11 @@ onMounted(loadOrders)
   margin-bottom: 20px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
 .order-card {
   cursor: pointer;
   transition: all 0.3s;
@@ -387,23 +517,89 @@ onMounted(loadOrders)
   justify-content: center;
 }
 
-/* 订单详情对话框样式 */
-.detail-header {
-  margin-bottom: 10px;
+/* 滑动视图样式 */
+.orders-slider-dialog :deep(.el-dialog__body) {
+  padding: 20px;
 }
 
-.detail-info {
+.orders-slider-container {
+  position: relative;
+  min-height: 500px;
+}
+
+.order-indicator {
+  text-align: center;
+  margin-bottom: 20px;
+  font-size: 18px;
+}
+
+.current-index {
+  font-size: 32px;
+  font-weight: bold;
+  color: #409eff;
+}
+
+.total {
+  color: #909399;
+}
+
+.table-info {
+  margin-left: 15px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.slider-controls {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 20px;
+  transform: translateY(-50%);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.slider-controls .el-button {
+  pointer-events: auto;
+}
+
+.current-order {
+  padding: 0 60px;
+}
+
+.order-detail-card {
+  margin-bottom: 20px;
+}
+
+.detail-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
 }
 
-.detail-meta {
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.header-left h3 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.order-meta {
   display: flex;
   gap: 20px;
   color: #909399;
-  font-size: 14px;
+}
+
+.items-list {
+  margin-top: 20px;
 }
 
 .items-list h4 {
@@ -411,25 +607,19 @@ onMounted(loadOrders)
   color: #303133;
 }
 
-.items-container {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
 .item-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 15px;
+  padding: 15px;
   background: #f5f7fa;
   border-radius: 8px;
+  margin-bottom: 10px;
 }
 
 .item-row.is-paid {
   background: #e8f5e9;
+  opacity: 0.7;
 }
 
 .item-info {
@@ -463,19 +653,26 @@ onMounted(loadOrders)
   margin-top: 4px;
 }
 
-.item-status {
+.item-status-section {
+  text-align: center;
   margin-left: 15px;
 }
 
+.status-actions {
+  margin-top: 8px;
+}
+
 .amount-section {
-  padding: 10px 0;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e4e7ed;
 }
 
 .amount-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: 10px 0;
   font-size: 16px;
 }
 
@@ -492,6 +689,15 @@ onMounted(loadOrders)
 
 .text-danger {
   color: #f56c6c;
+}
+
+.slider-actions {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e4e7ed;
 }
 
 /* 结账对话框样式 */
@@ -562,10 +768,12 @@ onMounted(loadOrders)
 }
 
 @media (max-width: 768px) {
-  .el-col {
-    width: 100%;
-    max-width: 100%;
-    flex: 0 0 100%;
+  .current-order {
+    padding: 0 40px;
+  }
+  
+  .slider-controls {
+    padding: 0 10px;
   }
 }
 </style>
