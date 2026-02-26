@@ -36,6 +36,10 @@ export function completeOrder(orderId: number): Promise<any> {
   return request.post(`/orders/${orderId}/complete`)
 }
 
+export function cancelOrder(orderId: number): Promise<any> {
+  return request.post(`/orders/${orderId}/cancel`)
+}
+
 export function getOrderByTable(tableId: number): Promise<any> {
   return request.get(`/orders/by-table/${tableId}`)
 }

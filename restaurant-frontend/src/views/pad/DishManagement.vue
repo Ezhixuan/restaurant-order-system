@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as dishApi from '@/api/dish'
 import * as dishSpecApi from '@/api/dishSpec'
 import type { SpecItem } from '@/api/dishSpec'
 
+const router = useRouter()
 const loading = ref(false)
 const categories = ref<any[]>([])
 const dishes = ref<any[]>([])
@@ -55,6 +57,11 @@ const loadDishes = async () => {
       categoryName: cat.name
     }))
   )
+}
+
+// 返回桌台页面
+const goBack = () => {
+  router.push('/pad/tables')
 }
 
 // 初始化
@@ -275,7 +282,12 @@ const getCategoryName = (id: number) => {
   <div class="pad-dish-management" v-loading="loading">
     <!-- 顶部操作栏 -->
     <div class="header">
-      <h2>菜品管理</h2>
+      <div class="header-left">
+        <el-button @click="goBack">
+          <el-icon><ArrowLeft /></el-icon>返回桌台
+        </el-button>
+        <h2>菜品管理</h2>
+      </div>
       <div class="header-actions">
         <el-button type="primary" @click="showAddCategory">
           <el-icon><Plus /></el-icon>分类
@@ -511,7 +523,13 @@ const getCategoryName = (id: number) => {
   margin-bottom: 20px;
 }
 
-.header h2 {
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.header-left h2 {
   margin: 0;
 }
 

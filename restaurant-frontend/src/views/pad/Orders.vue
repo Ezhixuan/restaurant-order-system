@@ -200,6 +200,13 @@ const confirmCheckout = async () => {
   }
 }
 
+// 从订单详情打开结账
+const openDetailCheckout = () => {
+  detailVisible.value = false
+  selectedUnpaidAmount.value = selectedUnpaidAmount.value
+  checkoutVisible.value = true
+}
+
 // 返回
 const goBack = () => {
   router.push('/pad/tables')
@@ -288,6 +295,105 @@ onMounted(loadOrders)
     </el-row>
 
     <el-empty v-if="orders.length === 0" description="暂无进行中的订单" />
+
+    <!-- 订单详情对话框 -->
+    <el-dialog
+      v-model="detailVisible"
+      title="订单详情"
+      width="700px"
+      :close-on-click-modal="false"
+    >
+      <div v-loading="detailLoading" class="order-detail-content">
+        <div v-if="selectedOrder" class="detail-header-info">
+          <div class="detail-row">
+            <span class="label">订单号:</span>
+            <span class="value">{{ selectedOrder.orderNo }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">桌号:</span>
+            <span class="value">{{ selectedOrder.tableNo }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">状态:</span>
+            <el-tag :type="getStatusType(selectedOrder.status)" size="small">
+              {{ getStatusLabel(selectedOrder.status) }}
+            </el-tag>
+          </div>
+          <div class="detail-row">
+            <span class="label">人数:</span>
+            <span class="value">{{ selectedOrder.customerCount }}人</span>
+          </div>
+          <div class="detail-row" v-if="selectedOrder.remark">
+            <span class="label">备注:</span>
+            <span class="value remark">{{ selectedOrder.remark }}</span>
+          </div>
+        </div>
+
+        <el-divider />
+
+        <!-- 菜品列表 -->
+        <div class="detail-items">
+          <h4>菜品清单 ({{ selectedItems.length }}道)</h4>
+          <div
+            v-for="item in selectedItems"
+            :key="item.id"
+            class="detail-item-row"
+            :class="{ 'is-paid': item.isPaid }"
+          >
+            <div class="item-info">
+              <div class="item-name">
+                {{ item.dishName }}
+                <el-tag v-if="item.specName" type="info" size="small">{{ item.specName }}</el-tag>
+                <el-tag v-if="item.isPaid" type="success" size="small">已结账</el-tag>
+              </div>
+              <div class="item-price">
+                ¥{{ item.price?.toFixed(2) }} x {{ item.quantity }}
+              </div>
+              <div v-if="item.remark" class="item-remark">备注: {{ item.remark }}</div>
+            </div>
+            <div class="item-status">
+              <el-tag :type="getItemStatusType(item.status)" size="small">
+                {{ getItemStatusLabel(item.status) }}
+              </el-tag>
+              <div class="item-subtotal">¥{{ item.subtotal?.toFixed(2) }}</div>
+            </div>
+          </div>
+        </div>
+
+        <el-divider />
+
+        <!-- 金额汇总 -->
+        <div class="detail-amount">
+          <div class="amount-row">
+            <span>总计金额:</span>
+            <span class="amount">¥{{ selectedOrder?.totalAmount?.toFixed(2) }}</span>
+          </div>
+          <div class="amount-row">
+            <span>优惠金额:</span>
+            <span class="amount">¥{{ selectedOrder?.discountAmount?.toFixed(2) || '0.00' }}</span>
+          </div>
+          <div class="amount-row">
+            <span>实付金额:</span>
+            <span class="amount">¥{{ selectedOrder?.payAmount?.toFixed(2) }}</span>
+          </div>
+          <div v-if="selectedUnpaidAmount > 0" class="amount-row unpaid">
+            <span>未结账金额:</span>
+            <span class="amount text-danger">¥{{ selectedUnpaidAmount.toFixed(2) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button 
+          v-if="selectedUnpaidAmount > 0" 
+          type="success" 
+          @click="openDetailCheckout"
+        >
+          结账 (¥{{ selectedUnpaidAmount.toFixed(2) }})
+        </el-button>
+      </template>
+    </el-dialog>
 
     <!-- 所有活跃订单滑动视图 -->
     <el-dialog
@@ -470,6 +576,127 @@ onMounted(loadOrders)
   padding: 20px;
   min-height: 100vh;
   background: #f5f7fa;
+}
+
+/* 订单详情对话框样式 */
+.order-detail-content {
+  padding: 10px;
+}
+
+.detail-header-info {
+  background: #f5f7fa;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.detail-row {
+  display: flex;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.detail-row .label {
+  width: 80px;
+  color: #909399;
+}
+
+.detail-row .value {
+  flex: 1;
+  font-weight: 500;
+  color: #303133;
+}
+
+.detail-row .value.remark {
+  color: #e6a23c;
+}
+
+.detail-items {
+  margin-top: 20px;
+}
+
+.detail-items h4 {
+  margin-bottom: 15px;
+  color: #303133;
+}
+
+.detail-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: #f5f7fa;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.detail-item-row.is-paid {
+  background: #e8f5e9;
+  opacity: 0.7;
+}
+
+.detail-item-row .item-info {
+  flex: 1;
+}
+
+.detail-item-row .item-name {
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-item-row .item-price {
+  font-size: 14px;
+  color: #606266;
+}
+
+.detail-item-row .item-remark {
+  font-size: 12px;
+  color: #e6a23c;
+  margin-top: 4px;
+}
+
+.detail-item-row .item-status {
+  text-align: right;
+}
+
+.detail-item-row .item-subtotal {
+  font-size: 16px;
+  font-weight: bold;
+  color: #f56c6c;
+  margin-top: 5px;
+}
+
+.detail-amount {
+  margin-top: 20px;
+}
+
+.detail-amount .amount-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  font-size: 16px;
+}
+
+.detail-amount .amount-row.unpaid {
+  font-weight: bold;
+  font-size: 18px;
+  border-top: 2px solid #f56c6c;
+  margin-top: 10px;
+  padding-top: 15px;
+}
+
+.detail-amount .amount {
+  font-size: 20px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.detail-amount .amount.text-danger {
+  color: #f56c6c;
 }
 
 .header {

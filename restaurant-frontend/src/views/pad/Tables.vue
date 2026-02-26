@@ -228,12 +228,24 @@ const handleCheckoutDialog = async (table: any) => {
   checkoutTable.value = table
   checkoutDialogVisible.value = true
   
-  // 这里应该获取该桌台的订单信息
-  // 为了演示，先用模拟数据
-  checkoutOrder.value = {
-    orderNo: 'ORD20260226001',
-    totalAmount: 256.00,
-    payAmount: 256.00
+  // 获取该桌台的订单信息
+  try {
+    const { getOrderByTable, getUnpaidAmount } = await import('@/api/order')
+    const orderData = await getOrderByTable(table.id)
+    if (orderData && orderData.order) {
+      const unpaidAmount = await getUnpaidAmount(orderData.order.id)
+      checkoutOrder.value = {
+        orderNo: orderData.order.orderNo,
+        totalAmount: orderData.order.totalAmount,
+        payAmount: unpaidAmount || orderData.order.payAmount
+      }
+    } else {
+      ElMessage.warning('未找到该桌台的订单信息')
+      checkoutDialogVisible.value = false
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || '获取订单信息失败')
+    checkoutDialogVisible.value = false
   }
 }
 
@@ -250,6 +262,11 @@ const confirmCheckout = async () => {
   } catch (error: any) {
     ElMessage.error(error.message || '结账失败')
   }
+}
+
+// 跳转到菜品管理
+const goToDishManagement = () => {
+  router.push('/pad/dishes')
 }
 
 // 其他原有方法...
@@ -366,6 +383,10 @@ onMounted(loadTables)
           
           <el-button type="primary" size="large" @click="handleAddTempTable">
             <el-icon><Plus /></el-icon>添加临时桌
+          </el-button>
+          
+          <el-button type="success" size="large" @click="goToDishManagement">
+            <el-icon><Food /></el-icon>菜品管理
           </el-button>
         </div>
       </div>
