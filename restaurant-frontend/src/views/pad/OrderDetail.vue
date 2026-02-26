@@ -31,11 +31,11 @@ const discountAmount = computed(() => {
   return (unpaidAmount.value || 0) - (actualPayAmount.value || 0)
 })
 
-// 处理抹零 - 直接取整数
+// 处理抹零 - 去掉个位数（如164→160）
 const handleRoundDown = () => {
-  const originalAmount = unpaidAmount.value || 0
-  // 直接取整数（去掉小数位）
-  actualPayAmount.value = Math.floor(originalAmount)
+  const originalAmount = Math.floor(unpaidAmount.value || 0)
+  // 去掉个位数，向下取整到十位
+  actualPayAmount.value = Math.floor(originalAmount / 10) * 10
 }
 
 // 重置实付金额
