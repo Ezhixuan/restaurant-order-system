@@ -230,12 +230,20 @@ onMounted(loadOrder)
           </div>
 
           <div class="info-item amount">
-            <div class="info-label">应收金额</div>
-            <div class="info-value" :class="{ 'text-danger': unpaidAmount > 0 }">
-              ¥{{ unpaidAmount.toFixed(2) }}
-              <span v-if="unpaidAmount !== order.payAmount" class="total-amount">
-                (总计: ¥{{ order.payAmount?.toFixed(2) }})
-              </span>
+            <div class="info-label">{{ order?.status >= 3 ? '实付金额' : '应收金额' }}</div>
+            <div class="info-value" :class="{ 'text-danger': unpaidAmount > 0 && order?.status < 3 }">
+              <template v-if="order?.status >= 3">
+                ¥{{ Math.floor(order?.payAmount || 0) }}
+                <span v-if="order?.discountAmount > 0" class="discount-tag">
+                  (优惠: ¥{{ Math.floor(order.discountAmount) }})
+                </span>
+              </template>
+              <template v-else>
+                ¥{{ Math.floor(unpaidAmount) }}
+                <span v-if="unpaidAmount !== order?.payAmount" class="total-amount">
+                  (总计: ¥{{ Math.floor(order?.payAmount || 0) }})
+                </span>
+              </template>
             </div>
           </div>
         </div>
@@ -330,14 +338,14 @@ onMounted(loadOrder)
       </el-card>
 
       <!-- 底部操作栏 -->
-      <div class="bottom-bar">
+      <div class="bottom-bar" v-if="order?.status < 3">
         <div class="total-section">
           <div class="total-label">未结账金额</div>
           <div class="total-value" :class="{ 'text-danger': unpaidAmount > 0 }">
-            ¥{{ unpaidAmount.toFixed(2) }}
+            ¥{{ Math.floor(unpaidAmount) }}
           </div>
         </div>
-
+        
         <el-button
           type="success"
           size="large"
@@ -345,6 +353,23 @@ onMounted(loadOrder)
           @click="openCheckout"
         >
           结账
+        </el-button>
+      </div>
+      
+      <!-- 已完成订单的底部栏 -->
+      <div class="bottom-bar completed" v-else>
+        <div class="total-section">
+          <div class="total-label">实付金额</div>
+          <div class="total-value">
+            ¥{{ Math.floor(order?.payAmount || 0) }}
+            <span v-if="order?.discountAmount > 0" class="discount-text">
+              (已优惠 ¥{{ Math.floor(order.discountAmount) }})
+            </span>
+          </div>
+        </div>
+        
+        <el-button type="info" size="large" disabled>
+          已完成
         </el-button>
       </div>
     </div>
@@ -513,6 +538,12 @@ onMounted(loadOrder)
   margin-left: 5px;
 }
 
+.discount-tag {
+  font-size: 14px;
+  color: #67c23a;
+  margin-left: 5px;
+}
+
 .order-remark {
   margin-top: 15px;
   padding: 12px 15px;
@@ -674,6 +705,16 @@ onMounted(loadOrder)
   align-items: center;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
   z-index: 100;
+}
+
+.bottom-bar.completed {
+  background: #f5f7fa;
+}
+
+.discount-text {
+  font-size: 14px;
+  color: #67c23a;
+  margin-left: 10px;
 }
 
 .total-section {

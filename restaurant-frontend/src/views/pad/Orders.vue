@@ -31,6 +31,24 @@ const payTypes = [
   { label: '支付宝', value: 2, icon: 'Wallet' }
 ]
 
+// 结账金额相关
+const actualPayAmount = ref<number>(0)
+const discountAmount = computed(() => {
+  return (selectedUnpaidAmount.value || 0) - (actualPayAmount.value || 0)
+})
+
+// 处理抹零 - 去掉个位数（如164→160）
+const handleRoundDown = () => {
+  const originalAmount = Math.floor(selectedUnpaidAmount.value || 0)
+  // 去掉个位数，向下取整到十位
+  actualPayAmount.value = Math.floor(originalAmount / 10) * 10
+}
+
+// 重置实付金额
+const resetPayAmount = () => {
+  actualPayAmount.value = Math.floor(selectedUnpaidAmount.value || 0)
+}
+
 // 从路由参数获取桌台信息
 const queryTableId = computed(() => Number(route.query.tableId) || 0)
 const queryTableNo = computed(() => route.query.tableNo as string || '')
@@ -176,6 +194,8 @@ const openCheckout = () => {
   }
   selectedOrder.value = order
   selectedUnpaidAmount.value = order.unpaidAmount
+  // 初始化实付金额（直接取整数）
+  actualPayAmount.value = Math.floor(order.unpaidAmount)
   checkoutVisible.value = true
 }
 
@@ -187,7 +207,7 @@ const confirmCheckout = async () => {
   try {
     await payOrder(order.id, {
       payType: payType.value,
-      amount: order.unpaidAmount || selectedUnpaidAmount.value
+      amount: actualPayAmount.value // 使用实付金额
     })
     
     ElMessage.success('结账成功')
@@ -204,6 +224,8 @@ const confirmCheckout = async () => {
 const openDetailCheckout = () => {
   detailVisible.value = false
   selectedUnpaidAmount.value = selectedUnpaidAmount.value
+  // 初始化实付金额
+  actualPayAmount.value = Math.floor(selectedUnpaidAmount.value)
   checkoutVisible.value = true
 }
 
@@ -282,7 +304,15 @@ onMounted(loadOrders)
 
           <div class="order-info">
             <div>人数: {{ order.customerCount }}人</div>
-            <div class="amount">¥{{ order.payAmount?.toFixed(2) }}</div>
+            <div class="amount">
+              <template v-if="order.status >= 3">
+                ¥{{ Math.floor(order.payAmount || 0) }}
+                <span v-if="order.discountAmount > 0" class="discount-tag">(优惠¥{{ Math.floor(order.discountAmount) }})</span>
+              </template>
+              <template v-else>
+                ¥{{ Math.floor(order.payAmount || 0) }}
+              </template>
+            </div>
           </div>
 
           <template #footer>
@@ -366,31 +396,31 @@ onMounted(loadOrders)
         <div class="detail-amount">
           <div class="amount-row">
             <span>总计金额:</span>
-            <span class="amount">¥{{ selectedOrder?.totalAmount?.toFixed(2) }}</span>
+            <span class="amount">¥{{ Math.floor(selectedOrder?.totalAmount || 0) }}</span>
           </div>
-          <div class="amount-row">
+          <div class="amount-row" v-if="selectedOrder?.discountAmount > 0">
             <span>优惠金额:</span>
-            <span class="amount">¥{{ selectedOrder?.discountAmount?.toFixed(2) || '0.00' }}</span>
+            <span class="amount discount-text">-¥{{ Math.floor(selectedOrder.discountAmount) }}</span>
           </div>
           <div class="amount-row">
             <span>实付金额:</span>
-            <span class="amount">¥{{ selectedOrder?.payAmount?.toFixed(2) }}</span>
+            <span class="amount">¥{{ Math.floor(selectedOrder?.payAmount || 0) }}</span>
           </div>
-          <div v-if="selectedUnpaidAmount > 0" class="amount-row unpaid">
+          <div v-if="selectedUnpaidAmount > 0 && selectedOrder?.status < 3" class="amount-row unpaid">
             <span>未结账金额:</span>
-            <span class="amount text-danger">¥{{ selectedUnpaidAmount.toFixed(2) }}</span>
+            <span class="amount text-danger">¥{{ Math.floor(selectedUnpaidAmount) }}</span>
           </div>
         </div>
       </div>
 
       <template #footer>
-        <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button @click="detailVisible = false"">关闭</el-button>
         <el-button 
-          v-if="selectedUnpaidAmount > 0" 
+          v-if="selectedUnpaidAmount > 0 && selectedOrder?.status < 3" 
           type="success" 
           @click="openDetailCheckout"
         >
-          结账 (¥{{ selectedUnpaidAmount.toFixed(2) }})
+          结账 (¥{{ Math.floor(selectedUnpaidAmount) }})
         </el-button>
       </template>
     </el-dialog>
@@ -507,11 +537,19 @@ onMounted(loadOrders)
             <div class="amount-section">
               <div class="amount-row">
                 <span>总计金额:</span>
-                <span class="amount-value">¥{{ allOrders[currentOrderIndex].payAmount?.toFixed(2) }}</span>
+                <span class="amount-value">¥{{ Math.floor(allOrders[currentOrderIndex].totalAmount || 0) }}</span>
               </div>
-              <div v-if="allOrders[currentOrderIndex].unpaidAmount > 0" class="amount-row unpaid">
+              <div v-if="allOrders[currentOrderIndex].discountAmount > 0" class="amount-row">
+                <span>优惠金额:</span>
+                <span class="amount-value discount-text">-¥{{ Math.floor(allOrders[currentOrderIndex].discountAmount) }}</span>
+              </div>
+              <div class="amount-row">
+                <span>实付金额:</span>
+                <span class="amount-value">¥{{ Math.floor(allOrders[currentOrderIndex].payAmount || 0) }}</span>
+              </div>
+              <div v-if="allOrders[currentOrderIndex].unpaidAmount > 0 && allOrders[currentOrderIndex].status < 3" class="amount-row unpaid">
                 <span>未结账金额:</span>
-                <span class="amount-value text-danger">¥{{ allOrders[currentOrderIndex].unpaidAmount.toFixed(2) }}</span>
+                <span class="amount-value text-danger">¥{{ Math.floor(allOrders[currentOrderIndex].unpaidAmount) }}</span>
               </div>
             </div>
           </el-card>
@@ -524,26 +562,58 @@ onMounted(loadOrders)
             <el-icon><Plus /></el-icon>加菜
           </el-button>
           <el-button
-            v-if="allOrders[currentOrderIndex]?.unpaidAmount > 0"
+            v-if="allOrders[currentOrderIndex]?.unpaidAmount > 0 && allOrders[currentOrderIndex]?.status < 3"
             type="success"
             @click="openCheckout"
           >
-            结账 (¥{{ allOrders[currentOrderIndex].unpaidAmount.toFixed(2) }})
+            结账 (¥{{ Math.floor(allOrders[currentOrderIndex].unpaidAmount) }})
           </el-button>
         </div>
       </div>
     </el-dialog>
 
     <!-- 结账对话框 -->
-    <el-dialog v-model="checkoutVisible" title="确认结账" width="450px">
+    <el-dialog v-model="checkoutVisible" title="确认结账" width="500px">
       <div class="checkout-content">
-        <div class="checkout-amount">
-          <div class="amount-label">应收金额</div>
-          <div class="amount-value">¥{{ selectedUnpaidAmount.toFixed(2) }}</div>
+        <!-- 应收金额 -->
+        <div class="checkout-row">
+          <span class="label">应收金额</span>
+          <span class="value original">¥{{ Math.floor(selectedUnpaidAmount) }}</span>
+        </div>
+
+        <!-- 实付金额输入 -->
+        <div class="checkout-row pay-input-row">
+          <span class="label">实付金额</span>
+          <div class="pay-input-wrapper">
+            <el-input-number
+              v-model="actualPayAmount"
+              :min="0"
+              :max="Math.floor(selectedUnpaidAmount * 2)"
+              :precision="0"
+              :step="1"
+              size="large"
+              style="width: 150px"
+            />
+            <el-button type="warning" size="small" @click="handleRoundDown">
+              <el-icon><Delete /></el-icon>抹零
+            </el-button>
+            <el-button size="small" @click="resetPayAmount">重置</el-button>
+          </div>
+        </div>
+
+        <!-- 优惠金额 -->
+        <div class="checkout-row discount-row" v-if="discountAmount > 0">
+          <span class="label">优惠金额</span>
+          <span class="value discount">-¥{{ Math.floor(discountAmount) }}</span>
+        </div>
+        <div class="checkout-row discount-row" v-else-if="discountAmount < 0">
+          <span class="label">溢收金额</span>
+          <span class="value extra">+¥{{ Math.floor(Math.abs(discountAmount)) }}</span>
         </div>
 
         <el-divider />
 
+        <!-- 支付方式 -->
         <div class="pay-type-section">
           <div class="section-label">选择支付方式</div>
           <div class="pay-type-options">
@@ -558,6 +628,14 @@ onMounted(loadOrders)
               <div class="type-label">{{ type.label }}</div>
             </div>
           </div>
+        </div>
+
+        <el-divider />
+
+        <!-- 确认金额 -->
+        <div class="checkout-row final-row">
+          <span class="label">确认收款</span>
+          <span class="value final">¥{{ Math.floor(actualPayAmount) }}</span>
         </div>
       </div>
 
@@ -699,6 +777,10 @@ onMounted(loadOrders)
   color: #f56c6c;
 }
 
+.detail-amount .discount-text {
+  color: #67c23a;
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -737,6 +819,12 @@ onMounted(loadOrders)
   color: #f56c6c;
   font-weight: bold;
   margin-top: 10px;
+}
+
+.discount-tag {
+  font-size: 12px;
+  color: #67c23a;
+  margin-left: 5px;
 }
 
 .order-actions {
@@ -992,6 +1080,69 @@ onMounted(loadOrders)
 .type-label {
   font-size: 14px;
   color: #606266;
+}
+
+/* 结账金额行样式 */
+.checkout-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  font-size: 16px;
+}
+
+.checkout-row .label {
+  color: #606266;
+}
+
+.checkout-row .value {
+  font-weight: 500;
+  color: #303133;
+}
+
+.checkout-row .value.original {
+  font-size: 18px;
+  text-decoration: line-through;
+  color: #909399;
+}
+
+.checkout-row .value.discount {
+  font-size: 18px;
+  color: #67c23a;
+}
+
+.checkout-row .value.extra {
+  font-size: 18px;
+  color: #e6a23c;
+}
+
+.checkout-row .value.final {
+  font-size: 28px;
+  font-weight: bold;
+  color: #f56c6c;
+}
+
+.pay-input-row {
+  background: #f5f7fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin: 10px 0;
+}
+
+.pay-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.discount-row {
+  padding: 8px 0;
+}
+
+.final-row {
+  padding: 15px 0;
+  border-top: 2px dashed #dcdfe6;
+  margin-top: 10px;
 }
 
 @media (max-width: 768px) {
