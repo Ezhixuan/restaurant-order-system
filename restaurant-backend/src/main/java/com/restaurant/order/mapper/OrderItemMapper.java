@@ -17,7 +17,7 @@ public interface OrderItemMapper extends BaseMapper<OrderItem> {
     
     @Select("SELECT dish_name as dishName, SUM(quantity) as totalQuantity, SUM(subtotal) as totalAmount " +
             "FROM order_item oi JOIN orders o ON oi.order_id = o.id " +
-            "WHERE DATE(o.created_at) = CURDATE() AND o.status = 4 " +
+            "WHERE DATE(o.created_at) = CURDATE() AND o.status = 3 " +
             "GROUP BY oi.dish_id, oi.dish_name " +
             "ORDER BY totalQuantity DESC LIMIT #{limit}")
     List<TopDishDTO> selectTopDishes(@Param("limit") Integer limit);

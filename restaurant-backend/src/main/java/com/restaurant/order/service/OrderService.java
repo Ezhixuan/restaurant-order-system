@@ -38,6 +38,7 @@ public class OrderService {
     private final DishMapper dishMapper;
     private final DishSpecMapper dishSpecMapper;
     private final TableMapper tableMapper;
+    private final OrderStatusService orderStatusService;
 
     public List<Order> listOrders(Integer status) {
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
@@ -70,7 +71,7 @@ public class OrderService {
         // 查询该桌台最新的未完成订单
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Order::getTableId, tableId)
-               .lt(Order::getStatus, 4)  // 未完成（状态 < 4）
+               .lt(Order::getStatus, 3)  // 未完成（状态 < 3）
                .orderByDesc(Order::getCreatedAt)
                .last("LIMIT 1");
         
@@ -154,7 +155,7 @@ public class OrderService {
         order.setTotalAmount(totalAmount);
         order.setDiscountAmount(BigDecimal.ZERO);
         order.setPayAmount(totalAmount);
-        order.setStatus(0); // 待支付
+        order.setStatus(0); // 待上菜
         order.setRemark(request.getRemark());
 
         // 先插入订单，获取ID
@@ -179,7 +180,7 @@ public class OrderService {
         if (order == null) {
             throw new BusinessException("订单不存在");
         }
-        if (order.getStatus() >= 4) {
+        if (order.getStatus() >= 3) {
             throw new BusinessException("订单已完成，无法加菜");
         }
 
@@ -230,7 +231,7 @@ public class OrderService {
         }
         
         // 如果订单已完成，无法加菜
-        if (order.getStatus() >= 4) {
+        if (order.getStatus() >= 3) {
             throw new BusinessException("订单已完成，无法加菜");
         }
 
@@ -318,22 +319,9 @@ public class OrderService {
         item.setStatus(status);
         orderItemMapper.updateById(item);
 
-        // 检查是否所有菜品都已完成
-        List<OrderItem> items = orderItemMapper.selectByOrderId(item.getOrderId());
-        boolean allCompleted = items.stream().allMatch(i -> i.getStatus() == 2);
-        
-        if (allCompleted) {
-            Order order = orderMapper.selectById(item.getOrderId());
-            order.setStatus(3); // 待上菜
-            orderMapper.updateById(order);
-        } else if (status == 1) {
-            // 有菜品开始制作，订单状态变为制作中
-            Order order = orderMapper.selectById(item.getOrderId());
-            if (order.getStatus() == 1) {
-                order.setStatus(2); // 制作中
-                orderMapper.updateById(order);
-            }
-        }
+        // 菜品状态更新后，重新计算订单状态
+        // 注：即使菜品已结账，仍然可以切换状态
+        orderStatusService.updateOrderStatus(item.getOrderId());
     }
 
     @Transactional
@@ -343,7 +331,7 @@ public class OrderService {
             throw new BusinessException("订单不存在");
         }
 
-        order.setStatus(4); // 已完成
+        order.setStatus(3); // 已完成
         orderMapper.updateById(order);
 
         // 更新桌台状态为待清台
@@ -364,7 +352,7 @@ public class OrderService {
             throw new BusinessException("订单已开始制作，无法取消");
         }
 
-        order.setStatus(5); // 已取消
+        order.setStatus(4); // 已取消
         orderMapper.updateById(order);
 
         // 恢复库存
@@ -380,7 +368,7 @@ public class OrderService {
         // 检查桌台是否还有其他订单，如果没有则恢复空闲
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Order::getTableId, order.getTableId())
-               .lt(Order::getStatus, 4);
+               .lt(Order::getStatus, 3);
         if (orderMapper.selectCount(wrapper) == 0) {
             RestaurantTable table = tableMapper.selectById(order.getTableId());
             table.setStatus(0); // 空闲

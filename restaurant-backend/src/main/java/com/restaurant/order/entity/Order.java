@@ -22,6 +22,6 @@ public class Order extends BaseEntity {
     private BigDecimal payAmount;     // 实付金额
     private Integer payType;          // 支付方式: 0未支付 1微信 2支付宝 3现金
     private LocalDateTime payTime;    // 支付时间
-    private Integer status;           // 状态: 0待支付 1已支付 2制作中 3待上菜 4已完成 5已取消
+    private Integer status;           // 状态: 0待上菜 1上菜中 2待结账 3已完成 4已取消
     private String remark;            // 订单备注
 }

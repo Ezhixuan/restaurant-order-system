@@ -27,10 +27,10 @@ public class OrderStatusService {
     /**
      * 根据菜品状态自动更新订单状态
      * 规则：
-     * - 待上菜(0)：新建订单默认状态
-     * - 上菜中(1)：有菜品在制作中或已完成
-     * - 待结账(2)：所有菜品都已完成（制作完成）
-     * - 已完成(3)：已结账
+     * - 待上菜(0)：没有任何菜品在制作中或已完成（即使已结账）
+     * - 上菜中(1)：有菜品在制作中或已完成，但未全部完成
+     * - 待结账(2)：所有菜品都已完成，但未结账
+     * - 已完成(3)：所有菜品都已完成，且已结账
      * - 追加订单(4)：已结账后又加菜
      */
     public void updateOrderStatus(Long orderId) {
@@ -44,28 +44,41 @@ public class OrderStatusService {
             return;
         }
 
-        int currentStatus = order.getStatus();
+        // 计算菜品状态
+        boolean hasCookingOrCompleted = items.stream().anyMatch(i -> i.getStatus() == 1 || i.getStatus() == 2);
+        boolean allCompleted = items.stream().allMatch(i -> i.getStatus() == 2);
+        
+        // 检查是否全部已结账
+        boolean allPaid = items.stream().allMatch(i -> i.getIsPaid() != null && i.getIsPaid() == 1);
 
-        // 已完成(3)或追加订单(4)状态不再自动变更
-        if (currentStatus >= 3) {
-            return;
+        int newStatus;
+        if (allCompleted) {
+            // 所有菜品都已完成
+            if (allPaid) {
+                newStatus = 3; // 已完成
+            } else {
+                newStatus = 2; // 待结账
+            }
+        } else if (hasCookingOrCompleted) {
+            // 有菜品在制作中或已完成，但未全部完成
+            newStatus = 1; // 上菜中
+        } else {
+            // 没有任何菜品在制作中或已完成（即使已结账也是待上菜）
+            newStatus = 0; // 待上菜
         }
 
-        boolean hasCooking = items.stream().anyMatch(i -> i.getStatus() == 1);
-        boolean hasFinished = items.stream().anyMatch(i -> i.getStatus() == 2);
-        boolean allFinished = items.stream().allMatch(i -> i.getStatus() == 2);
-
-        if (currentStatus == 0) {
-            // 待上菜状态
-            if (hasCooking || hasFinished) {
-                order.setStatus(1); // 转为上菜中
-                orderMapper.updateById(order);
-            }
-        } else if (currentStatus == 1) {
-            // 上菜中状态
-            if (allFinished) {
-                order.setStatus(2); // 转为待结账
-                orderMapper.updateById(order);
+        // 只有在状态真正变化时才更新
+        if (order.getStatus() != newStatus) {
+            order.setStatus(newStatus);
+            orderMapper.updateById(order);
+            
+            // 如果订单完成，更新桌台状态为待清台
+            if (newStatus == 3) {
+                RestaurantTable table = tableMapper.selectById(order.getTableId());
+                if (table != null && table.getStatus() != 2) {
+                    table.setStatus(2); // 待清台
+                    tableMapper.updateById(table);
+                }
             }
         }
     }
@@ -139,25 +152,10 @@ public class OrderStatusService {
         order.setDiscountAmount(order.getDiscountAmount().add(discount));
         order.setPayType(payType);
         order.setPayTime(LocalDateTime.now());
-
-        // 检查是否还有未结账菜品
-        List<OrderItem> remainingUnpaid = getUnpaidItems(orderId);
-        if (remainingUnpaid.isEmpty()) {
-            // 全部结账完成
-            order.setStatus(3); // 已完成
-            
-            // 更新桌台状态为待清台
-            RestaurantTable table = tableMapper.selectById(order.getTableId());
-            if (table != null) {
-                table.setStatus(2); // 待清台
-                tableMapper.updateById(table);
-            }
-        } else {
-            // 还有未结账菜品（追加订单情况）
-            order.setStatus(4); // 追加订单
-        }
-
         orderMapper.updateById(order);
+
+        // 结账后根据菜品状态更新订单状态
+        updateOrderStatus(orderId);
     }
 
     /**
