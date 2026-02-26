@@ -131,7 +131,11 @@ public class OrderStatusService {
         }
 
         // 更新订单支付信息
-        order.setPayAmount(order.getPayAmount().add(amount));
+        // 注意：这里直接设置实付金额，不是累加
+        // 因为createOrder时payAmount被设为totalAmount（应付），所以这里要减去应付，加上实付
+        BigDecimal currentPayAmount = order.getPayAmount();
+        BigDecimal newPayAmount = currentPayAmount.subtract(shouldPay).add(amount);
+        order.setPayAmount(newPayAmount);
         order.setDiscountAmount(order.getDiscountAmount().add(discount));
         order.setPayType(payType);
         order.setPayTime(LocalDateTime.now());
