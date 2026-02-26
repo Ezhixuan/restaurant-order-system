@@ -25,6 +25,24 @@ const payTypes = [
   { label: '支付宝', value: 2, icon: 'Wallet' }
 ]
 
+// 结账金额相关
+const actualPayAmount = ref<number>(0)
+const discountAmount = computed(() => {
+  return (unpaidAmount.value || 0) - (actualPayAmount.value || 0)
+})
+
+// 处理抹零
+const handleRoundDown = () => {
+  const originalAmount = unpaidAmount.value || 0
+  // 向下取整到整数
+  actualPayAmount.value = Math.floor(originalAmount)
+}
+
+// 重置实付金额
+const resetPayAmount = () => {
+  actualPayAmount.value = unpaidAmount.value || 0
+}
+
 const loadOrder = async () => {
   if (!tableId.value) {
     ElMessage.error('桌台信息缺失')
@@ -39,7 +57,7 @@ const loadOrder = async () => {
     if (detail) {
       order.value = detail.order
       items.value = detail.items || []
-      
+
       // 获取未结账金额
       if (order.value?.id) {
         try {
@@ -115,27 +133,29 @@ const handleUpdateStatus = async (item: any, newStatus: number) => {
 // 打开结账对话框
 const openCheckout = () => {
   if (!order.value) return
-  
+
   // 计算应付金额
   const shouldPay = unpaidAmount.value
   if (shouldPay <= 0) {
     ElMessage.warning('没有待结账的金额')
     return
   }
-  
+
+  // 初始化实付金额
+  actualPayAmount.value = shouldPay
   checkoutVisible.value = true
 }
 
 // 确认结账
 const confirmCheckout = async () => {
   if (!order.value) return
-  
+
   try {
     await payOrder(order.value.id, {
       payType: payType.value,
-      amount: unpaidAmount.value
+      amount: actualPayAmount.value // 使用实付金额
     })
-    
+
     ElMessage.success('结账成功')
     checkoutVisible.value = false
     loadOrder() // 刷新
@@ -147,13 +167,13 @@ const confirmCheckout = async () => {
 // 加菜
 const addMore = () => {
   if (!order.value) return
-  
+
   cartStore.setTableInfo(order.value.tableId, order.value.tableNo, order.value.customerCount)
   cartStore.clearCart()
-  
+
   router.push({
     path: '/pad/order',
-    query: { 
+    query: {
       mode: 'add',
       orderId: order.value.id,
       tableId: order.value.tableId,
@@ -183,7 +203,7 @@ onMounted(loadOrder)
           </el-tag>
         </div>
       </div>
-      
+
       <div class="header-right" v-if="order">
         <span class="order-no">订单: {{ order.orderNo }}</span>
       </div>
@@ -198,17 +218,17 @@ onMounted(loadOrder)
             <div class="info-label">用餐人数</div>
             <div class="info-value">{{ order.customerCount }}人</div>
           </div>
-          
+
           <div class="info-item">
             <div class="info-label">下单时间</div>
             <div class="info-value">{{ new Date(order.createdAt).toLocaleString() }}</div>
           </div>
-          
+
           <div class="info-item">
             <div class="info-label">菜品数量</div>
             <div class="info-value">{{ items.reduce((sum, i) => sum + i.quantity, 0) }}份</div>
           </div>
-          
+
           <div class="info-item amount">
             <div class="info-label">应收金额</div>
             <div class="info-value" :class="{ 'text-danger': unpaidAmount > 0 }">
@@ -219,7 +239,7 @@ onMounted(loadOrder)
             </div>
           </div>
         </div>
-        
+
         <!-- 订单备注 -->
         <div v-if="order.remark" class="order-remark">
           <el-icon><Info-Filled /></el-icon>
@@ -250,7 +270,7 @@ onMounted(loadOrder)
                 <img :src="item.dishImage || 'https://img.yzcdn.cn/vant/ipad.jpeg'" />
                 <div v-if="item.isPaid" class="paid-badge">已结账</div>
               </div>
-              
+
               <div class="item-info">
                 <div class="item-name">
                   {{ item.dishName }}
@@ -260,19 +280,19 @@ onMounted(loadOrder)
                   <span class="item-price">¥{{ item.price?.toFixed(2) }} x {{ item.quantity }}</span>
                   <span class="item-subtotal" :class="{ 'is-paid': item.isPaid }">¥{{ item.subtotal?.toFixed(2) }}</span>
                 </div>
-                
+
                 <div v-if="item.remark" class="item-remark">
                   备注: {{ item.remark }}
                 </div>
               </div>
             </div>
-            
+
             <div class="item-status">
               <el-tag :type="getStatusType(item.status)" size="large" effect="dark">
                 {{ getStatusLabel(item.status) }}
               </el-tag>
             </div>
-            
+
             <div class="item-actions">
               <el-button-group v-if="!item.isPaid">
                 <el-button
@@ -300,12 +320,12 @@ onMounted(loadOrder)
                   已完成
                 </el-button>
               </el-button-group>
-              
+
               <div v-else class="completed-text">✓ 已结账</div>
             </div>
           </div>
         </div>
-        
+
         <van-empty v-else description="暂无菜品" />
       </el-card>
 
@@ -317,7 +337,7 @@ onMounted(loadOrder)
             ¥{{ unpaidAmount.toFixed(2) }}
           </div>
         </div>
-        
+
         <el-button
           type="success"
           size="large"
@@ -333,17 +353,49 @@ onMounted(loadOrder)
     <el-empty v-else description="暂无订单信息" />
 
     <!-- 结账对话框 -->
-    <el-dialog v-model="checkoutVisible" title="确认结账" width="450px">
+    <el-dialog v-model="checkoutVisible" title="确认结账" width="500px">
       <div v-if="order" class="checkout-content">
-        <div class="checkout-amount">
-          <div class="amount-label">应收金额</div>
-          <div class="amount-value">¥{{ unpaidAmount.toFixed(2) }}</div>
+        <!-- 应收金额 -->
+        <div class="checkout-row">
+          <span class="label">应收金额</span>
+          <span class="value original">¥{{ unpaidAmount.toFixed(2) }}</span>
         </div>
-        
+
+        <!-- 实付金额输入 -->
+        <div class="checkout-row pay-input-row">
+          <span class="label">实付金额</span>
+          <div class="pay-input-wrapper">
+            <el-input-number
+              v-model="actualPayAmount"
+              :min="0"
+              :max="unpaidAmount * 2"
+              :precision="2"
+              :step="1"
+              size="large"
+              style="width: 150px"
+            />
+            <el-button type="warning" size="small" @click="handleRoundDown">
+              <el-icon><Delete /></el-icon>抹零
+            </el-button>
+            <el-button size="small" @click="resetPayAmount">重置</el-button>
+          </div>
+        </div>
+
+        <!-- 优惠金额 -->
+        <div class="checkout-row discount-row" v-if="discountAmount > 0">
+          <span class="label">优惠金额</span>
+          <span class="value discount">-¥{{ discountAmount.toFixed(2) }}</span>
+        </div>
+        <div class="checkout-row discount-row" v-else-if="discountAmount < 0">
+          <span class="label">溢收金额</span>
+          <span class="value extra">+¥{{ Math.abs(discountAmount).toFixed(2) }}</span>
+        </div>
+
         <el-divider />
-        
+
+        <!-- 支付方式 -->
         <div class="pay-type-section">
-          <div class="section-label">选择支付方式</div>          
+          <div class="section-label">选择支付方式</div>
           <div class="pay-type-options">
             <div
               v-for="type in payTypes"
@@ -357,9 +409,15 @@ onMounted(loadOrder)
             </div>
           </div>
         </div>
-        
+
         <el-divider />
-        
+
+        <!-- 确认金额 -->
+        <div class="checkout-row final-row">
+          <span class="label">确认收款</span>
+          <span class="value final">¥{{ actualPayAmount.toFixed(2) }}</span>
+        </div>
+
         <el-alert
           title="确认后该批次菜品将标记为已结账"
           type="info"
@@ -367,7 +425,7 @@ onMounted(loadOrder)
           center
         />
       </div>
-      
+
       <template #footer>
         <el-button @click="checkoutVisible = false">取消</el-button>
         <el-button type="primary" size="large" @click="confirmCheckout">
@@ -655,6 +713,69 @@ onMounted(loadOrder)
   color: #f56c6c;
 }
 
+/* 结账金额行样式 */
+.checkout-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  font-size: 16px;
+}
+
+.checkout-row .label {
+  color: #606266;
+}
+
+.checkout-row .value {
+  font-weight: 500;
+  color: #303133;
+}
+
+.checkout-row .value.original {
+  font-size: 18px;
+  text-decoration: line-through;
+  color: #909399;
+}
+
+.checkout-row .value.discount {
+  font-size: 18px;
+  color: #67c23a;
+}
+
+.checkout-row .value.extra {
+  font-size: 18px;
+  color: #e6a23c;
+}
+
+.checkout-row .value.final {
+  font-size: 28px;
+  font-weight: bold;
+  color: #f56c6c;
+}
+
+.pay-input-row {
+  background: #f5f7fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin: 10px 0;
+}
+
+.pay-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.discount-row {
+  padding: 8px 0;
+}
+
+.final-row {
+  padding: 15px 0;
+  border-top: 2px dashed #dcdfe6;
+  margin-top: 10px;
+}
+
 .pay-type-section {
   padding: 10px 0;
 }
@@ -704,11 +825,11 @@ onMounted(loadOrder)
   .info-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   .item-row {
     flex-wrap: wrap;
   }
-  
+
   .item-actions {
     width: 100%;
     text-align: left;
