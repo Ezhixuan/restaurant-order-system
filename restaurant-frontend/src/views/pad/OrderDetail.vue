@@ -31,16 +31,16 @@ const discountAmount = computed(() => {
   return (unpaidAmount.value || 0) - (actualPayAmount.value || 0)
 })
 
-// 处理抹零
+// 处理抹零 - 直接取整数
 const handleRoundDown = () => {
   const originalAmount = unpaidAmount.value || 0
-  // 向下取整到整数
+  // 直接取整数（去掉小数位）
   actualPayAmount.value = Math.floor(originalAmount)
 }
 
 // 重置实付金额
 const resetPayAmount = () => {
-  actualPayAmount.value = unpaidAmount.value || 0
+  actualPayAmount.value = Math.floor(unpaidAmount.value || 0)
 }
 
 const loadOrder = async () => {
@@ -141,8 +141,8 @@ const openCheckout = () => {
     return
   }
 
-  // 初始化实付金额
-  actualPayAmount.value = shouldPay
+  // 初始化实付金额（直接取整数）
+  actualPayAmount.value = Math.floor(shouldPay)
   checkoutVisible.value = true
 }
 
@@ -358,7 +358,7 @@ onMounted(loadOrder)
         <!-- 应收金额 -->
         <div class="checkout-row">
           <span class="label">应收金额</span>
-          <span class="value original">¥{{ unpaidAmount.toFixed(2) }}</span>
+          <span class="value original">¥{{ Math.floor(unpaidAmount) }}</span>
         </div>
 
         <!-- 实付金额输入 -->
@@ -368,8 +368,8 @@ onMounted(loadOrder)
             <el-input-number
               v-model="actualPayAmount"
               :min="0"
-              :max="unpaidAmount * 2"
-              :precision="2"
+              :max="Math.floor(unpaidAmount * 2)"
+              :precision="0"
               :step="1"
               size="large"
               style="width: 150px"
@@ -384,11 +384,11 @@ onMounted(loadOrder)
         <!-- 优惠金额 -->
         <div class="checkout-row discount-row" v-if="discountAmount > 0">
           <span class="label">优惠金额</span>
-          <span class="value discount">-¥{{ discountAmount.toFixed(2) }}</span>
+          <span class="value discount">-¥{{ Math.floor(discountAmount) }}</span>
         </div>
         <div class="checkout-row discount-row" v-else-if="discountAmount < 0">
           <span class="label">溢收金额</span>
-          <span class="value extra">+¥{{ Math.abs(discountAmount).toFixed(2) }}</span>
+          <span class="value extra">+¥{{ Math.floor(Math.abs(discountAmount)) }}</span>
         </div>
 
         <el-divider />
@@ -415,7 +415,7 @@ onMounted(loadOrder)
         <!-- 确认金额 -->
         <div class="checkout-row final-row">
           <span class="label">确认收款</span>
-          <span class="value final">¥{{ actualPayAmount.toFixed(2) }}</span>
+          <span class="value final">¥{{ Math.floor(actualPayAmount) }}</span>
         </div>
 
         <el-alert
