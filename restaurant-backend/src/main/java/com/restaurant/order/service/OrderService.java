@@ -3,7 +3,9 @@ package com.restaurant.order.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.restaurant.common.exception.BusinessException;
 import com.restaurant.dish.entity.Dish;
+import com.restaurant.dish.entity.DishSpec;
 import com.restaurant.dish.mapper.DishMapper;
+import com.restaurant.dish.mapper.DishSpecMapper;
 import com.restaurant.order.dto.AddDishRequest;
 import com.restaurant.order.dto.BatchAddDishRequest;
 import com.restaurant.order.dto.CartItemDTO;
@@ -34,6 +36,7 @@ public class OrderService {
     private final OrderMapper orderMapper;
     private final OrderItemMapper orderItemMapper;
     private final DishMapper dishMapper;
+    private final DishSpecMapper dishSpecMapper;
     private final TableMapper tableMapper;
 
     public List<Order> listOrders(Integer status) {
@@ -109,11 +112,28 @@ public class OrderService {
             item.setDishId(dish.getId());
             item.setDishName(dish.getName());
             item.setDishImage(dish.getImage());
-            item.setPrice(dish.getPrice());
             item.setQuantity(cartItem.getQuantity());
             item.setRemark(cartItem.getRemark());
-            item.setSubtotal(dish.getPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity())));
             item.setStatus(0); // 待制作
+            
+            // 处理规格
+            BigDecimal unitPrice;
+            if (cartItem.getSpecId() != null) {
+                // 使用规格价格
+                DishSpec spec = dishSpecMapper.selectById(cartItem.getSpecId());
+                if (spec == null || spec.getStatus() != 1) {
+                    throw new BusinessException("规格不存在或已禁用: " + cartItem.getSpecName());
+                }
+                item.setSpecId(spec.getId());
+                item.setSpecName(spec.getName());
+                unitPrice = spec.getPrice();
+            } else {
+                // 使用菜品基础价格
+                unitPrice = dish.getPrice();
+            }
+            
+            item.setPrice(unitPrice);
+            item.setSubtotal(unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity())));
             items.add(item);
             
             totalAmount = totalAmount.add(item.getSubtotal());

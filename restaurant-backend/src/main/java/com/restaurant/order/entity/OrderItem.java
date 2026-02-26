@@ -14,7 +14,9 @@ public class OrderItem extends BaseEntity {
     
     private Long orderId;         // 订单ID
     private Long dishId;          // 菜品ID
+    private Long specId;          // 规格ID(可选)
     private String dishName;      // 菜品名称(快照)
+    private String specName;      // 规格名称(快照)
     private String dishImage;     // 菜品图片(快照)
     private BigDecimal price;     // 单价(快照)
     private Integer quantity;     // 数量

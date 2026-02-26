@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -61,6 +62,14 @@ public class DishController {
         return Result.success(dishService.getDishById(id));
     }
 
+    /**
+     * 获取菜品详情（包含规格）
+     */
+    @GetMapping("/{id}/detail")
+    public Result<DishDetailDTO> getDetail(@PathVariable Long id) {
+        return Result.success(dishService.getDetailWithSpecs(id));
+    }
+
     @PostMapping
     public Result<Void> create(@Valid @RequestBody CreateDishRequest request) {
         dishService.createDish(request);
@@ -82,6 +91,24 @@ public class DishController {
     @PostMapping("/{id}/toggle")
     public Result<Void> toggleStatus(@PathVariable Long id) {
         dishService.toggleStatus(id);
+        return Result.success();
+    }
+
+    /**
+     * 切换菜品规格模式
+     */
+    @PostMapping("/{id}/toggle-specs")
+    public Result<Void> toggleHasSpecs(@PathVariable Long id) {
+        dishService.toggleHasSpecs(id);
+        return Result.success();
+    }
+
+    /**
+     * 快速更新价格 (Pad端专用)
+     */
+    @PostMapping("/{id}/price")
+    public Result<Void> updatePrice(@PathVariable Long id, @RequestParam BigDecimal price) {
+        dishService.updatePrice(id, price);
         return Result.success();
     }
 }
