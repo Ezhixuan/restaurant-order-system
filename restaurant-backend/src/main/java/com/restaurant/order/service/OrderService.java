@@ -286,8 +286,24 @@ public class OrderService {
             throw new BusinessException("订单状态错误");
         }
 
+        BigDecimal shouldPay = order.getPayAmount();
+        BigDecimal actualPay = request.getAmount();
+
+        // 验证金额（允许支付金额小于等于应付金额，支持抹零优惠）
+        if (actualPay == null || actualPay.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("支付金额必须大于0");
+        }
+        if (actualPay.compareTo(shouldPay) > 0) {
+            throw new BusinessException("支付金额不能超过应付金额：¥" + shouldPay);
+        }
+
+        // 计算优惠金额
+        BigDecimal discount = shouldPay.subtract(actualPay);
+
         order.setStatus(1); // 已支付
         order.setPayType(request.getPayType());
+        order.setPayAmount(actualPay); // 记录实际支付金额
+        order.setDiscountAmount(discount); // 记录优惠金额
         order.setPayTime(LocalDateTime.now());
         orderMapper.updateById(order);
     }

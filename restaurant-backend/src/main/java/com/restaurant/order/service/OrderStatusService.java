@@ -93,6 +93,7 @@ public class OrderStatusService {
     /**
      * 结账
      * 支持部分结账（已结账后加菜的情况）
+     * 支持抹零优惠（支付金额可以小于应付金额）
      */
     @Transactional
     public void checkout(Long orderId, Integer payType, BigDecimal amount) {
@@ -112,10 +113,16 @@ public class OrderStatusService {
                 .map(OrderItem::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 验证金额
-        if (amount.compareTo(shouldPay) < 0) {
-            throw new BusinessException("支付金额不足，应付：¥" + shouldPay);
+        // 验证金额（允许支付金额小于等于应付金额，支持抹零优惠）
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("支付金额必须大于0");
         }
+        if (amount.compareTo(shouldPay) > 0) {
+            throw new BusinessException("支付金额不能超过应付金额：¥" + shouldPay);
+        }
+
+        // 计算优惠金额（应付 - 实付）
+        BigDecimal discount = shouldPay.subtract(amount);
 
         // 标记未结账的菜品为已结账
         for (OrderItem item : unpaidItems) {
@@ -125,6 +132,7 @@ public class OrderStatusService {
 
         // 更新订单支付信息
         order.setPayAmount(order.getPayAmount().add(amount));
+        order.setDiscountAmount(order.getDiscountAmount().add(discount));
         order.setPayType(payType);
         order.setPayTime(LocalDateTime.now());
 
