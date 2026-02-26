@@ -219,6 +219,12 @@ onMounted(loadOrder)
             </div>
           </div>
         </div>
+        
+        <!-- 订单备注 -->
+        <div v-if="order.remark" class="order-remark">
+          <el-icon><Info-Filled /></el-icon>
+          <span>订单备注: {{ order.remark }}</span>
+        </div>
       </el-card>
 
       <!-- 菜品列表 -->
@@ -447,6 +453,18 @@ onMounted(loadOrder)
   font-size: 14px;
   color: #909399;
   margin-left: 5px;
+}
+
+.order-remark {
+  margin-top: 15px;
+  padding: 12px 15px;
+  background: #fdf6ec;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #e6a23c;
+  font-size: 14px;
 }
 
 .info-label {

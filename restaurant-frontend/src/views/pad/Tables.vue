@@ -194,22 +194,36 @@ const confirmOpenTable = async () => {
 }
 
 // 继续点餐（加菜）
-const continueOrder = () => {
+const continueOrder = async () => {
   if (!selectedBusyTable.value) return
   
-  cartStore.setTableInfo(selectedBusyTable.value.id, selectedBusyTable.value.tableNo, 1)
-  cartStore.clearCart()
-  
-  busyTableDialogVisible.value = false
-  router.push({
-    path: '/pad/order',
-    query: { 
-      mode: 'add',
-      tableId: selectedBusyTable.value.id,
-      tableNo: selectedBusyTable.value.tableNo,
-      customerCount: selectedBusyTable.value.capacity
+  // 获取当前桌台的订单信息
+  try {
+    const { getOrderByTable } = await import('@/api/order')
+    const orderData = await getOrderByTable(selectedBusyTable.value.id)
+    
+    if (!orderData || !orderData.order) {
+      ElMessage.warning('未找到该桌台的订单信息')
+      return
     }
-  })
+    
+    cartStore.setTableInfo(selectedBusyTable.value.id, selectedBusyTable.value.tableNo, orderData.order.customerCount || 1)
+    cartStore.clearCart()
+    
+    busyTableDialogVisible.value = false
+    router.push({
+      path: '/pad/order',
+      query: { 
+        mode: 'add',
+        orderId: orderData.order.id,
+        tableId: selectedBusyTable.value.id,
+        tableNo: selectedBusyTable.value.tableNo,
+        customerCount: orderData.order.customerCount || 1
+      }
+    })
+  } catch (error: any) {
+    ElMessage.error(error.message || '获取订单信息失败')
+  }
 }
 
 // 查看订单
@@ -267,6 +281,11 @@ const confirmCheckout = async () => {
 // 跳转到菜品管理
 const goToDishManagement = () => {
   router.push('/pad/dishes')
+}
+
+// 跳转到订单页面
+const goToOrders = () => {
+  router.push('/pad/orders')
 }
 
 // 其他原有方法...
@@ -387,6 +406,10 @@ onMounted(loadTables)
           
           <el-button type="success" size="large" @click="goToDishManagement">
             <el-icon><Food /></el-icon>菜品管理
+          </el-button>
+          
+          <el-button type="warning" size="large" @click="goToOrders">
+            <el-icon><Document /></el-icon>查看订单
           </el-button>
         </div>
       </div>
