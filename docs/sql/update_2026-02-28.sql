@@ -7,6 +7,21 @@
 USE restaurant_order;
 
 -- ============================================
+-- 0. 修复 dish 表缺失字段
+-- ============================================
+-- 检查并添加 has_specs 字段
+SET @exists_has_specs := (SELECT COUNT(*) FROM information_schema.columns
+                          WHERE table_schema = 'restaurant_order'
+                          AND table_name = 'dish'
+                          AND column_name = 'has_specs');
+SET @sql_has_specs := IF(@exists_has_specs = 0,
+                         'ALTER TABLE `dish` ADD COLUMN `has_specs` TINYINT DEFAULT 0 COMMENT "是否有规格: 0无 1有" AFTER `sort_order`',
+                         'SELECT "has_specs already exists"');
+PREPARE stmt_has_specs FROM @sql_has_specs;
+EXECUTE stmt_has_specs;
+DEALLOCATE PREPARE stmt_has_specs;
+
+-- ============================================
 -- 1. 添加 dish_spec 菜品规格表
 -- ============================================
 CREATE TABLE IF NOT EXISTS `dish_spec` (
