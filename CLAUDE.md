@@ -97,12 +97,19 @@ All API responses use `Result<T>` wrapper:
 ## Order Status Flow
 
 ```
-0: 待支付 (Pending Payment)
-1: 已支付 (Paid)
-2: 制作中 (Cooking)
-3: 待上菜 (Ready to Serve)
-4: 已完成 (Completed)
-5: 已取消 (Cancelled)
+0: 待上菜 (Pending Serve)
+1: 上菜中 (Serving)
+2: 待结账 (Pending Payment)
+3: 已完成 (Completed)
+4: 已取消 (Cancelled)
+```
+
+## Order Item Status (Kitchen)
+
+```
+0: 待制作 (Pending Cooking)
+1: 制作中 (Cooking)
+2: 已完成 (Completed)
 ```
 
 ## Table Status
