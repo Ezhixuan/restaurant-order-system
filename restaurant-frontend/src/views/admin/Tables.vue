@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTables, createTable, updateTable, deleteTable, openTable, clearTable } from '@/api/table'
+import {
+  getTables,
+  createTable,
+  updateTable,
+  deleteTable,
+  openTable,
+  clearTable,
+} from '@/api/table'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -22,7 +29,7 @@ const form = ref({
   name: '',
   type: 1,
   capacity: 4,
-  sortOrder: 0
+  sortOrder: 0,
 })
 
 // 开台对话框
@@ -45,7 +52,7 @@ const loadTables = async () => {
 // 筛选后的桌台
 const filteredTables = computed(() => {
   let result = tables.value
-  
+
   // 区域筛选
   if (areaFilter.value !== 'all') {
     if (areaFilter.value === 'fixed') {
@@ -58,21 +65,20 @@ const filteredTables = computed(() => {
       result = result.filter(t => t.tableNo.startsWith('B'))
     }
   }
-  
+
   // 状态筛选
   if (statusFilter.value !== null) {
     result = result.filter(t => t.status === statusFilter.value)
   }
-  
+
   // 搜索
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase()
-    result = result.filter(t => 
-      t.tableNo.toLowerCase().includes(keyword) ||
-      t.name.toLowerCase().includes(keyword)
+    result = result.filter(
+      t => t.tableNo.toLowerCase().includes(keyword) || t.name.toLowerCase().includes(keyword)
     )
   }
-  
+
   return result.sort((a, b) => a.sortOrder - b.sortOrder)
 })
 
@@ -93,7 +99,7 @@ const handleAdd = () => {
     name: '',
     type: 1,
     capacity: 4,
-    sortOrder: 0
+    sortOrder: 0,
   }
   dialogVisible.value = true
 }
@@ -165,7 +171,7 @@ const handleOpenTable = async () => {
     ElMessage.success('开台成功')
     openTableVisible.value = false
     loadTables()
-    
+
     // 可以跳转到点餐页面
     // router.push(`/pad/order?tableId=${selectedTable.value.id}`)
   } catch (error: any) {
@@ -176,7 +182,9 @@ const handleOpenTable = async () => {
 // 清台
 const handleClearTable = async (table: any) => {
   try {
-    await ElMessageBox.confirm(`${table.name} 待清台，是否确认清台？`, '确认清台', { type: 'warning' })
+    await ElMessageBox.confirm(`${table.name} 待清台，是否确认清台？`, '确认清台', {
+      type: 'warning',
+    })
     await clearTable(table.id)
     ElMessage.success('清台成功')
     loadTables()
@@ -191,16 +199,24 @@ const handleClearTable = async (table: any) => {
 const generateTableNo = () => {
   const existingFixed = tables.value.filter(t => t.type === 1)
   const existingTemp = tables.value.filter(t => t.type === 2)
-  
+
   if (form.value.type === 1) {
     // 固定桌号建议
     const usedLetters = [...new Set(existingFixed.map(t => t.tableNo.charAt(0)))]
     const letter = usedLetters.length > 0 ? usedLetters[0] : 'A'
-    const maxNum = Math.max(...existingFixed.filter(t => t.tableNo.startsWith(letter)).map(t => parseInt(t.tableNo.slice(1)) || 0), 0)
+    const maxNum = Math.max(
+      ...existingFixed
+        .filter(t => t.tableNo.startsWith(letter))
+        .map(t => parseInt(t.tableNo.slice(1)) || 0),
+      0
+    )
     form.value.tableNo = `${letter}${String(maxNum + 1).padStart(2, '0')}`
   } else {
     // 临时桌号建议
-    const maxTemp = Math.max(...existingTemp.map(t => parseInt(t.tableNo.replace('临', '')) || 0), 0)
+    const maxTemp = Math.max(
+      ...existingTemp.map(t => parseInt(t.tableNo.replace('临', '')) || 0),
+      0
+    )
     form.value.tableNo = `临${maxTemp + 1}`
   }
 }
@@ -239,7 +255,9 @@ onMounted(loadTables)
     <el-row :gutter="15" class="stats-row">
       <el-col :xs="12" :sm="6" :lg="3">
         <div class="stat-item total">
-          <div class="stat-icon"><el-icon :size="24"><OfficeBuilding /></el-icon></div>
+          <div class="stat-icon">
+            <el-icon :size="24"><OfficeBuilding /></el-icon>
+          </div>
           <div class="stat-info">
             <div class="stat-num">{{ stats.total }}</div>
             <div class="stat-label">总桌台</div>
@@ -248,7 +266,9 @@ onMounted(loadTables)
       </el-col>
       <el-col :xs="12" :sm="6" :lg="3">
         <div class="stat-item free">
-          <div class="stat-icon"><el-icon :size="24"><CircleCheck /></el-icon></div>
+          <div class="stat-icon">
+            <el-icon :size="24"><CircleCheck /></el-icon>
+          </div>
           <div class="stat-info">
             <div class="stat-num">{{ stats.free }}</div>
             <div class="stat-label">空闲</div>
@@ -257,7 +277,9 @@ onMounted(loadTables)
       </el-col>
       <el-col :xs="12" :sm="6" :lg="3">
         <div class="stat-item busy">
-          <div class="stat-icon"><el-icon :size="24"><UserFilled /></el-icon></div>
+          <div class="stat-icon">
+            <el-icon :size="24"><UserFilled /></el-icon>
+          </div>
           <div class="stat-info">
             <div class="stat-num">{{ stats.busy }}</div>
             <div class="stat-label">使用中</div>
@@ -266,7 +288,9 @@ onMounted(loadTables)
       </el-col>
       <el-col :xs="12" :sm="6" :lg="3">
         <div class="stat-item pending">
-          <div class="stat-icon"><el-icon :size="24"><Warning /></el-icon></div>
+          <div class="stat-icon">
+            <el-icon :size="24"><Warning /></el-icon>
+          </div>
           <div class="stat-info">
             <div class="stat-num">{{ stats.pending }}</div>
             <div class="stat-label">待清台</div>
@@ -286,9 +310,9 @@ onMounted(loadTables)
             <el-radio-button label="fixed">固定座位</el-radio-button>
             <el-radio-button label="temp">临时座位</el-radio-button>
           </el-radio-group>
-          
+
           <el-divider direction="vertical" />
-          
+
           <el-radio-group v-model="statusFilter" size="large">
             <el-radio-button :label="null">全部状态</el-radio-button>
             <el-radio-button :label="0">空闲</el-radio-button>
@@ -296,7 +320,7 @@ onMounted(loadTables)
             <el-radio-button :label="2">待清台</el-radio-button>
           </el-radio-group>
         </div>
-        
+
         <div class="filter-right">
           <el-input
             v-model="searchKeyword"
@@ -304,9 +328,11 @@ onMounted(loadTables)
             clearable
             style="width: 200px"
           >
-            <template #prefix><el-icon><Search /></el-icon></template>
+            <template #prefix
+              ><el-icon><Search /></el-icon
+            ></template>
           </el-input>
-          
+
           <el-button type="primary" size="large" @click="handleAdd">
             <el-icon><Plus /></el-icon>添加桌台
           </el-button>
@@ -315,7 +341,7 @@ onMounted(loadTables)
     </el-card>
 
     <!-- 桌台网格 -->
-    <div class="tables-grid" v-loading="loading">
+    <div v-loading="loading" class="tables-grid">
       <div
         v-for="table in filteredTables"
         :key="table.id"
@@ -324,7 +350,7 @@ onMounted(loadTables)
         @click="handleTableClick(table)"
       >
         <div class="table-status-bar" :class="`bg-${getStatusType(table.status)}`"></div>
-        
+
         <div class="table-content">
           <div class="table-header">
             <span class="table-no">{{ table.tableNo }}</span>
@@ -332,74 +358,79 @@ onMounted(loadTables)
               {{ getStatusLabel(table.status) }}
             </el-tag>
           </div>
-          
+
           <div class="table-name">{{ table.name }}</div>
-          
+
           <div class="table-meta">
             <span class="meta-item">
               <el-icon><User /></el-icon>
               {{ table.capacity }}人
             </span>
-            <span class="meta-item" v-if="table.type === 2">
+            <span v-if="table.type === 2" class="meta-item">
               <el-icon><Timer /></el-icon>
               临时
             </span>
           </div>
-          
+
           <div class="table-icon">
             <el-icon :size="48" :class="`text-${getStatusType(table.status)}`">
               <component :is="getStatusIcon(table.status)" />
             </el-icon>
           </div>
         </div>
-        
+
         <div class="table-actions" @click.stop>
-          <el-button type="primary" link size="small" @click="handleEdit(table)">
-            编辑
-          </el-button>
-          <el-button type="danger" link size="small" @click="handleDelete(table)">
-            删除
-          </el-button>
+          <el-button type="primary" link size="small" @click="handleEdit(table)"> 编辑 </el-button>
+          <el-button type="danger" link size="small" @click="handleDelete(table)"> 删除 </el-button>
         </div>
       </div>
-      
+
       <!-- 空状态 -->
-      <el-empty v-if="filteredTables.length === 0" description="暂无桌台数据" style="grid-column: 1/-1;" />
+      <el-empty
+        v-if="filteredTables.length === 0"
+        description="暂无桌台数据"
+        style="grid-column: 1/-1"
+      />
     </div>
 
     <!-- 添加/编辑对话框 -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑桌台' : '添加桌台'" width="500px" destroy-on-close>
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? '编辑桌台' : '添加桌台'"
+      width="500px"
+      destroy-on-close
+    >
       <el-form :model="form" label-width="100px">
         <el-form-item label="类型">
-          <el-radio-group v-model="form.type" @change="onTypeChange" :disabled="isEdit">
+          <el-radio-group v-model="form.type" :disabled="isEdit" @change="onTypeChange">
             <el-radio-button :label="1">固定卡座</el-radio-button>
             <el-radio-button :label="2">临时座位</el-radio-button>
           </el-radio-group>
         </el-form-item>
-        
+
         <el-form-item label="桌号">
           <el-input v-model="form.tableNo" placeholder="如：A01、临1">
-            <template #append v-if="!isEdit">
+            <template v-if="!isEdit" #append>
               <el-button @click="generateTableNo">自动生成</el-button>
             </template>
           </el-input>
         </el-form-item>
-        
+
         <el-form-item label="桌台名称">
           <el-input v-model="form.name" placeholder="如：包厢1、路边1号桌" />
         </el-form-item>
-        
+
         <el-form-item label="容纳人数">
           <el-input-number v-model="form.capacity" :min="1" :max="50" style="width: 150px" />
           <span class="form-tip">人</span>
         </el-form-item>
-        
+
         <el-form-item label="排序">
           <el-input-number v-model="form.sortOrder" :min="0" style="width: 150px" />
           <span class="form-tip">数字越小排序越靠前</span>
         </el-form-item>
       </el-form>
-      
+
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="handleSubmit">确定</el-button>
@@ -418,13 +449,18 @@ onMounted(loadTables)
           <span class="value">{{ selectedTable.capacity }}人</span>
         </div>
       </div>
-      
+
       <el-form label-width="100px" style="margin-top: 20px">
         <el-form-item label="用餐人数">
-          <el-input-number v-model="customerCount" :min="1" :max="selectedTable?.capacity || 20" size="large" />
+          <el-input-number
+            v-model="customerCount"
+            :min="1"
+            :max="selectedTable?.capacity || 20"
+            size="large"
+          />
         </el-form-item>
       </el-form>
-      
+
       <template #footer>
         <el-button @click="openTableVisible = false">取消</el-button>
         <el-button type="primary" @click="handleOpenTable">确认开台</el-button>
@@ -676,16 +712,16 @@ onMounted(loadTables)
     grid-template-columns: repeat(2, 1fr);
     gap: 15px;
   }
-  
+
   .filter-bar {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .filter-left {
     width: 100%;
   }
-  
+
   .filter-right {
     width: 100%;
     justify-content: space-between;

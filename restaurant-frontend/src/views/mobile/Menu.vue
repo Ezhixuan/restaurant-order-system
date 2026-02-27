@@ -1,4 +1,5 @@
-<script setup lang="ts">import { ref, onMounted, computed } from 'vue'
+<script setup lang="ts">
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast, showLoadingToast, closeToast, showConfirmDialog } from 'vant'
 import { getDishesByCategory } from '@/api/dish'
@@ -12,7 +13,7 @@ const router = useRouter()
 const cartStore = useCartStore()
 
 const tableNo = route.params.tableNo as string
-categories.value = []
+const categories = ref<any[]>([])
 const activeCategory = ref(0)
 const loading = ref(false)
 const searchKeyword = ref('')
@@ -61,10 +62,10 @@ const loadTableInfo = async () => {
     if (currentTable) {
       tableId.value = currentTable.id
       cartStore.setTableInfo(currentTable.id, tableNo, cartStore.customerCount || 1)
-      
+
       // 检查是否有活跃订单
       await checkExistingOrder(currentTable.id)
-      
+
       // 如果没有活跃订单且是首次进入（customerCount为1），显示人数选择
       if (!existingOrder.value && cartStore.customerCount === 1) {
         showCustomerDialog.value = true
@@ -110,23 +111,23 @@ const viewOrder = () => {
     showToast('没有可查看的订单')
     return
   }
-  
+
   router.push({
     path: '/m/success',
     query: {
       tableId: tableId.value.toString(),
-      tableNo: tableNo
-    }
+      tableNo: tableNo,
+    },
   })
 }
 
 // 搜索过滤后的菜品
 const filteredDishes = computed(() => {
   if (!searchKeyword.value) return []
-  
+
   const keyword = searchKeyword.value.toLowerCase()
   const result: any[] = []
-  
+
   categories.value.forEach(cat => {
     cat.dishes.forEach((dish: any) => {
       if (dish.name.toLowerCase().includes(keyword)) {
@@ -134,14 +135,14 @@ const filteredDishes = computed(() => {
       }
     })
   })
-  
+
   return result
 })
 
 // 当前分类的菜品
 const currentDishes = computed(() => {
   if (searchKeyword.value) return filteredDishes.value
-  
+
   const category = categories.value.find(c => c.id === activeCategory.value)
   return category?.dishes || []
 })
@@ -175,7 +176,7 @@ const addToCart = (dish: any) => {
     name: dish.name,
     price: dish.price,
     image: dish.image,
-    quantity: 1
+    quantity: 1,
   })
   showToast('已加入购物车')
 }
@@ -183,7 +184,7 @@ const addToCart = (dish: any) => {
 // 添加规格商品到购物车
 const addSpecToCart = () => {
   if (!currentDish.value || !selectedSpec.value) return
-  
+
   cartStore.addItem({
     dishId: currentDish.value.id,
     specId: selectedSpec.value.id,
@@ -191,9 +192,9 @@ const addSpecToCart = () => {
     specName: selectedSpec.value.name,
     price: selectedSpec.value.price,
     image: currentDish.value.image,
-    quantity: specQuantity.value
+    quantity: specQuantity.value,
   })
-  
+
   showSpecDialog.value = false
   showToast(`已添加 ${currentDish.value.name} (${selectedSpec.value.name})`)
 }
@@ -220,14 +221,14 @@ const confirmSubmit = async () => {
 
   try {
     await checkExistingOrder(tableId.value!)
-    
+
     if (existingOrder.value && existingOrder.value.status < 4) {
       // 追加到现有订单
       for (const item of cartStore.items) {
         await addDishToOrder(existingOrder.value.id, {
           dishId: item.dishId,
           quantity: item.quantity,
-          remark: item.remark || ''
+          remark: item.remark || '',
         })
       }
       closeToast()
@@ -245,24 +246,24 @@ const confirmSubmit = async () => {
           dishImage: item.image,
           price: item.price,
           quantity: item.quantity,
-          remark: item.remark || ''
+          remark: item.remark || '',
         })),
-        remark: orderRemark.value
+        remark: orderRemark.value,
       }
       await createOrder(orderData)
       closeToast()
       showToast('下单成功')
     }
-    
+
     cartStore.clearCart()
     orderRemark.value = ''
-    
+
     router.push({
       path: '/m/success',
       query: {
         tableId: tableId.value!.toString(),
-        tableNo: tableNo
-      }
+        tableNo: tableNo,
+      },
     })
   } catch (error: any) {
     closeToast()
@@ -304,8 +305,8 @@ onMounted(() => {
           size="small"
           round
           icon="orders-o"
+          style="margin-right: 10px"
           @click="viewOrder"
-          style="margin-right: 10px;"
         >
           查看订单
         </van-button>
@@ -345,10 +346,10 @@ onMounted(() => {
                 <div v-if="dish.isRecommend" class="recommend-badge">推荐</div>
                 <div v-if="dish.hasSpecs === 1" class="spec-badge">多规格</div>
               </div>
-              
+
               <div class="dish-info">
                 <div class="dish-name">{{ dish.name }}</div>
-                <div class="dish-desc" v-if="dish.description">{{ dish.description }}</div>
+                <div v-if="dish.description" class="dish-desc">{{ dish.description }}</div>
                 <div class="dish-bottom">
                   <div class="dish-price">
                     <span class="price-symbol">¥</span>
@@ -364,7 +365,7 @@ onMounted(() => {
               </div>
             </div>
           </div>
-          
+
           <van-empty v-if="category.dishes.length === 0" description="暂无菜品" />
         </van-tab>
       </van-tabs>
@@ -372,10 +373,8 @@ onMounted(() => {
 
     <!-- 搜索结果 -->
     <div v-else class="search-results">
-      <div class="search-header">
-        搜索结果 ({{ filteredDishes.length }})
-      </div>
-      
+      <div class="search-header">搜索结果 ({{ filteredDishes.length }})</div>
+
       <div class="dish-list">
         <div
           v-for="dish in filteredDishes"
@@ -386,11 +385,11 @@ onMounted(() => {
           <div class="dish-image">
             <img :src="dish.image || 'https://img.yzcdn.cn/vant/ipad.jpeg'" />
           </div>
-          
+
           <div class="dish-info">
             <div class="dish-name">{{ dish.name }}</div>
             <div class="dish-category">{{ dish.categoryName }}</div>
-            
+
             <div class="dish-bottom">
               <div class="dish-price">
                 <span class="price-symbol">¥</span>
@@ -403,12 +402,12 @@ onMounted(() => {
           </div>
         </div>
       </div>
-      
+
       <van-empty v-if="filteredDishes.length === 0" description="未找到相关菜品" />
     </div>
 
     <!-- 底部购物车栏 -->
-    <div class="cart-bar" v-if="cartCount > 0">
+    <div v-if="cartCount > 0" class="cart-bar">
       <div class="cart-info" @click="submitOrder">
         <div class="cart-icon">
           <van-icon name="shopping-cart-o" :badge="cartCount" />
@@ -418,12 +417,12 @@ onMounted(() => {
           <span class="price-num">{{ cartTotal.toFixed(2) }}</span>
         </div>
       </div>
-      
+
       <van-button type="primary" round @click="submitOrder">
         {{ existingOrder ? '追加到订单' : '去结算' }}
       </van-button>
     </div>
-    
+
     <!-- 空状态提示 -->
     <van-empty v-if="!loading && categories.length === 0" description="暂无菜品数据" />
 
@@ -469,8 +468,8 @@ onMounted(() => {
             </van-cell-group>
           </van-radio-group>
         </div>
-        
-        <div class="picker-label" style="margin-top: 15px;">数量</div>
+
+        <div class="picker-label" style="margin-top: 15px">数量</div>
         <van-stepper v-model="specQuantity" :min="1" :max="99" />
       </div>
     </van-dialog>

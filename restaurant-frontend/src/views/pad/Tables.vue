@@ -20,7 +20,7 @@ const tempTableDialogVisible = ref(false)
 const tempTableForm = ref({
   tableNo: '',
   name: '',
-  capacity: 4
+  capacity: 4,
 })
 
 // 使用中桌台选择对话框
@@ -74,7 +74,7 @@ const loadTables = async () => {
 // 筛选后的桌台
 const filteredTables = computed(() => {
   let result = tables.value
-  
+
   if (areaFilter.value !== 'all') {
     if (areaFilter.value === 'fixed') {
       result = result.filter(t => t.type === 1)
@@ -86,19 +86,18 @@ const filteredTables = computed(() => {
       result = result.filter(t => t.tableNo.startsWith('B'))
     }
   }
-  
+
   if (statusFilter.value !== null) {
     result = result.filter(t => t.status === statusFilter.value)
   }
-  
+
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase()
-    result = result.filter(t => 
-      t.tableNo.toLowerCase().includes(keyword) ||
-      t.name.toLowerCase().includes(keyword)
+    result = result.filter(
+      t => t.tableNo.toLowerCase().includes(keyword) || t.name.toLowerCase().includes(keyword)
     )
   }
-  
+
   return result.sort((a, b) => a.sortOrder - b.sortOrder)
 })
 
@@ -129,7 +128,7 @@ const handleTableClick = async (table: any) => {
 // 处理清台
 const handleClearTable = async (table: any) => {
   selectedClearTable.value = table
-  
+
   if (table.status === 1) {
     // 使用中 -> 调用 setPendingClear 进入待清台状态
     try {
@@ -148,13 +147,15 @@ const handleClearTable = async (table: any) => {
 // 确认清台
 const confirmClearTable = async () => {
   if (!selectedClearTable.value) return
-  
+
   try {
     // 1. 获取该桌台的所有未完成订单并标记为完成
     const { getActiveOrders, completeOrder } = await import('@/api/order')
     const orders = await getActiveOrders()
-    const tableOrders = orders.filter((o: any) => o.tableId === selectedClearTable.value.id && o.status < 3)
-    
+    const tableOrders = orders.filter(
+      (o: any) => o.tableId === selectedClearTable.value.id && o.status < 3
+    )
+
     // 批量完成订单
     for (const order of tableOrders) {
       try {
@@ -163,10 +164,10 @@ const confirmClearTable = async () => {
         console.log('订单可能已完成:', order.id)
       }
     }
-    
+
     // 2. 调用清台接口恢复桌台为空闲状态
     await clearTable(selectedClearTable.value.id)
-    
+
     ElMessage.success('清台成功')
     clearTableDialogVisible.value = false
     selectedClearTable.value = null
@@ -191,24 +192,24 @@ const confirmOpenTable = async () => {
   if (!selectedTable.value) return
   try {
     await openTable(selectedTable.value.id, customerCount.value)
-    
+
     // 先清空购物车，再设置新的桌台信息
     cartStore.clearCart()
     // 设置购物车信息（在clearCart之后设置，避免被重置）
     cartStore.setTableInfo(selectedTable.value.id, selectedTable.value.tableNo, customerCount.value)
-    
+
     ElMessage.success('开台成功')
     openTableDialogVisible.value = false
-    
+
     // 跳转到点餐页面（新建订单模式）
     router.push({
       path: '/pad/order',
-      query: { 
+      query: {
         mode: 'new',
         tableId: selectedTable.value.id,
         tableNo: selectedTable.value.tableNo,
-        customerCount: customerCount.value
-      }
+        customerCount: customerCount.value,
+      },
     })
   } catch (error: any) {
     ElMessage.error(error.message || '开台失败')
@@ -218,30 +219,34 @@ const confirmOpenTable = async () => {
 // 继续点餐（加菜）
 const continueOrder = async () => {
   if (!selectedBusyTable.value) return
-  
+
   // 获取当前桌台的订单信息
   try {
     const { getOrderByTable } = await import('@/api/order')
     const orderData = await getOrderByTable(selectedBusyTable.value.id)
-    
+
     if (!orderData || !orderData.order) {
       ElMessage.warning('未找到该桌台的订单信息')
       return
     }
-    
-    cartStore.setTableInfo(selectedBusyTable.value.id, selectedBusyTable.value.tableNo, orderData.order.customerCount || 1)
+
+    cartStore.setTableInfo(
+      selectedBusyTable.value.id,
+      selectedBusyTable.value.tableNo,
+      orderData.order.customerCount || 1
+    )
     cartStore.clearCart()
-    
+
     busyTableDialogVisible.value = false
     router.push({
       path: '/pad/order',
-      query: { 
+      query: {
         mode: 'add',
         orderId: orderData.order.id,
         tableId: selectedBusyTable.value.id,
         tableNo: selectedBusyTable.value.tableNo,
-        customerCount: orderData.order.customerCount || 1
-      }
+        customerCount: orderData.order.customerCount || 1,
+      },
     })
   } catch (error: any) {
     ElMessage.error(error.message || '获取订单信息失败')
@@ -251,11 +256,11 @@ const continueOrder = async () => {
 // 查看订单
 const viewOrder = () => {
   if (!selectedBusyTable.value) return
-  
+
   busyTableDialogVisible.value = false
   router.push({
     path: '/pad/order-detail',
-    query: { tableId: selectedBusyTable.value.id }
+    query: { tableId: selectedBusyTable.value.id },
   })
 }
 
@@ -263,7 +268,7 @@ const viewOrder = () => {
 const handleCheckoutDialog = async (table: any) => {
   checkoutTable.value = table
   checkoutDialogVisible.value = true
-  
+
   // 获取该桌台的订单信息
   try {
     const { getOrderByTable, getUnpaidAmount } = await import('@/api/order')
@@ -274,7 +279,7 @@ const handleCheckoutDialog = async (table: any) => {
       checkoutOrder.value = {
         orderNo: orderData.order.orderNo,
         totalAmount: orderData.order.totalAmount,
-        payAmount: payAmount
+        payAmount: payAmount,
       }
       // 初始化实付金额（直接取整数）
       actualPayAmount.value = Math.floor(payAmount)
@@ -319,7 +324,7 @@ const handleAddTempTable = () => {
   tempTableForm.value = {
     tableNo: `临${tempCount + 1}`,
     name: `临时${tempCount + 1}号桌`,
-    capacity: 4
+    capacity: 4,
   }
   tempTableDialogVisible.value = true
 }
@@ -329,7 +334,7 @@ const submitTempTable = async () => {
     await createTable({
       ...tempTableForm.value,
       type: 2,
-      sortOrder: 999
+      sortOrder: 999,
     })
     ElMessage.success('添加成功')
     tempTableDialogVisible.value = false
@@ -340,19 +345,19 @@ const submitTempTable = async () => {
 }
 
 const getStatusType = (status: number) => {
-  const map: Record<number, string> = { 
-    0: 'success',   // 空闲
-    1: 'danger',    // 使用中
-    2: 'warning'    // 待清台
+  const map: Record<number, string> = {
+    0: 'success', // 空闲
+    1: 'danger', // 使用中
+    2: 'warning', // 待清台
   }
   return map[status] || 'info'
 }
 
 const getStatusLabel = (status: number) => {
-  const map: Record<number, string> = { 
-    0: '空闲', 
-    1: '使用中', 
-    2: '待清台'
+  const map: Record<number, string> = {
+    0: '空闲',
+    1: '使用中',
+    2: '待清台',
   }
   return map[status] || '未知'
 }
@@ -361,12 +366,14 @@ onMounted(loadTables)
 </script>
 
 <template>
-  <div class="pad-tables" v-loading="loading">
+  <div v-loading="loading" class="pad-tables">
     <!-- 统计卡片 -->
     <el-row :gutter="15" class="stats-row">
       <el-col :xs="12" :sm="6" :lg="3">
         <div class="stat-item total">
-          <div class="stat-icon"><el-icon :size="24"><OfficeBuilding /></el-icon></div>
+          <div class="stat-icon">
+            <el-icon :size="24"><OfficeBuilding /></el-icon>
+          </div>
           <div class="stat-info">
             <div class="stat-num">{{ stats.total }}</div>
             <div class="stat-label">总桌台</div>
@@ -375,7 +382,9 @@ onMounted(loadTables)
       </el-col>
       <el-col :xs="12" :sm="6" :lg="3">
         <div class="stat-item free">
-          <div class="stat-icon"><el-icon :size="24"><CircleCheck /></el-icon></div>
+          <div class="stat-icon">
+            <el-icon :size="24"><CircleCheck /></el-icon>
+          </div>
           <div class="stat-info">
             <div class="stat-num">{{ stats.free }}</div>
             <div class="stat-label">空闲</div>
@@ -384,7 +393,9 @@ onMounted(loadTables)
       </el-col>
       <el-col :xs="12" :sm="6" :lg="3">
         <div class="stat-item busy">
-          <div class="stat-icon"><el-icon :size="24"><UserFilled /></el-icon></div>
+          <div class="stat-icon">
+            <el-icon :size="24"><UserFilled /></el-icon>
+          </div>
           <div class="stat-info">
             <div class="stat-num">{{ stats.busy }}</div>
             <div class="stat-label">使用中</div>
@@ -393,7 +404,9 @@ onMounted(loadTables)
       </el-col>
       <el-col :xs="12" :sm="6" :lg="3">
         <div class="stat-item pending">
-          <div class="stat-icon"><el-icon :size="24"><Warning /></el-icon></div>
+          <div class="stat-icon">
+            <el-icon :size="24"><Warning /></el-icon>
+          </div>
           <div class="stat-info">
             <div class="stat-num">{{ stats.pending }}</div>
             <div class="stat-label">待清台</div>
@@ -414,7 +427,7 @@ onMounted(loadTables)
             <el-radio-button label="temp">临时座位</el-radio-button>
           </el-radio-group>
         </div>
-        
+
         <div class="filter-right">
           <el-input
             v-model="searchKeyword"
@@ -422,17 +435,19 @@ onMounted(loadTables)
             clearable
             style="width: 200px"
           >
-            <template #prefix><el-icon><Search /></el-icon></template>
+            <template #prefix
+              ><el-icon><Search /></el-icon
+            ></template>
           </el-input>
-          
+
           <el-button type="primary" size="large" @click="handleAddTempTable">
             <el-icon><Plus /></el-icon>添加临时桌
           </el-button>
-          
+
           <el-button type="success" size="large" @click="goToDishManagement">
             <el-icon><Food /></el-icon>菜品管理
           </el-button>
-          
+
           <el-button type="warning" size="large" @click="goToOrders">
             <el-icon><Document /></el-icon>查看订单
           </el-button>
@@ -441,7 +456,7 @@ onMounted(loadTables)
     </el-card>
 
     <!-- 桌台网格 -->
-    <div class="tables-grid" v-loading="loading">
+    <div v-loading="loading" class="tables-grid">
       <div
         v-for="table in filteredTables"
         :key="table.id"
@@ -450,7 +465,7 @@ onMounted(loadTables)
         @click="handleTableClick(table)"
       >
         <div class="table-status-bar" :class="`bg-${getStatusType(table.status)}`"></div>
-        
+
         <div class="table-content">
           <div class="table-header">
             <span class="table-no">{{ table.tableNo }}</span>
@@ -458,20 +473,20 @@ onMounted(loadTables)
               {{ getStatusLabel(table.status) }}
             </el-tag>
           </div>
-          
+
           <div class="table-name">{{ table.name }}</div>
-          
+
           <div class="table-meta">
             <span class="meta-item">
               <el-icon><User /></el-icon>
               {{ table.capacity }}人
             </span>
-            <span class="meta-item" v-if="table.type === 2">
+            <span v-if="table.type === 2" class="meta-item">
               <el-icon><Timer /></el-icon>
               临时
             </span>
           </div>
-          
+
           <!-- 使用中和待清台状态显示清台按钮 -->
           <div v-if="table.status === 1 || table.status === 2" class="clear-table-btn">
             <el-button
@@ -484,8 +499,12 @@ onMounted(loadTables)
           </div>
         </div>
       </div>
-      
-      <el-empty v-if="filteredTables.length === 0" description="暂无桌台数据" style="grid-column: 1/-1;" />
+
+      <el-empty
+        v-if="filteredTables.length === 0"
+        description="暂无桌台数据"
+        style="grid-column: 1/-1"
+      />
     </div>
 
     <!-- 开台对话框 -->
@@ -500,13 +519,18 @@ onMounted(loadTables)
           <span class="value">{{ selectedTable.capacity }}人</span>
         </div>
       </div>
-      
+
       <el-form label-width="100px" style="margin-top: 20px">
         <el-form-item label="用餐人数">
-          <el-input-number v-model="customerCount" :min="1" :max="selectedTable?.capacity || 20" size="large" />
+          <el-input-number
+            v-model="customerCount"
+            :min="1"
+            :max="selectedTable?.capacity || 20"
+            size="large"
+          />
         </el-form-item>
       </el-form>
-      
+
       <template #footer>
         <el-button @click="openTableDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="confirmOpenTable">确认开台</el-button>
@@ -519,15 +543,17 @@ onMounted(loadTables)
         <div class="info-header">
           <el-icon :size="48" color="#f56c6c"><UserFilled /></el-icon>
           <div class="info-title">{{ selectedBusyTable.name }}</div>
-          <div class="info-subtitle">{{ selectedBusyTable.tableNo }} · {{ selectedBusyTable.capacity }}人桌</div>
+          <div class="info-subtitle">
+            {{ selectedBusyTable.tableNo }} · {{ selectedBusyTable.capacity }}人桌
+          </div>
         </div>
-        
+
         <div class="action-buttons">
           <el-button type="primary" size="large" @click="continueOrder">
             <el-icon><Plus /></el-icon>
             继续点餐（加菜）
           </el-button>
-          
+
           <el-button type="success" size="large" @click="viewOrder">
             <el-icon><Document /></el-icon>
             查看订单详情
@@ -543,15 +569,15 @@ onMounted(loadTables)
           <div class="checkout-title">{{ checkoutTable.name }} 账单</div>
           <div class="checkout-order">订单号：{{ checkoutOrder.orderNo }}</div>
         </div>
-        
+
         <el-divider />
-        
+
         <!-- 应收金额 -->
         <div class="checkout-row">
           <span class="label">应收金额</span>
           <span class="value original">¥{{ Math.floor(checkoutOrder.payAmount || 0) }}</span>
         </div>
-        
+
         <!-- 实付金额输入 -->
         <div class="checkout-row pay-input-row">
           <span class="label">实付金额</span>
@@ -571,25 +597,25 @@ onMounted(loadTables)
             <el-button size="small" @click="resetPayAmount">重置</el-button>
           </div>
         </div>
-        
+
         <!-- 优惠金额 -->
-        <div class="checkout-row discount-row" v-if="discountAmount > 0">
+        <div v-if="discountAmount > 0" class="checkout-row discount-row">
           <span class="label">优惠金额</span>
           <span class="value discount">-¥{{ Math.floor(discountAmount) }}</span>
         </div>
-        <div class="checkout-row discount-row" v-else-if="discountAmount < 0">
+        <div v-else-if="discountAmount < 0" class="checkout-row discount-row">
           <span class="label">溢收金额</span>
           <span class="value extra">+¥{{ Math.floor(Math.abs(discountAmount)) }}</span>
         </div>
-        
+
         <el-divider />
-        
+
         <!-- 确认金额 -->
         <div class="checkout-row final-row">
           <span class="label">确认收款</span>
           <span class="value final">¥{{ Math.floor(actualPayAmount) }}</span>
         </div>
-        
+
         <div class="checkout-actions">
           <el-alert
             title="确认收款后，桌台将自动清台"
@@ -597,7 +623,7 @@ onMounted(loadTables)
             :closable="false"
             style="margin-bottom: 15px"
           />
-          
+
           <el-button type="primary" size="large" style="width: 100%" @click="confirmCheckout">
             确认收款并清台
           </el-button>
@@ -618,7 +644,7 @@ onMounted(loadTables)
           <el-input-number v-model="tempTableForm.capacity" :min="1" :max="20" />
         </el-form-item>
       </el-form>
-      
+
       <template #footer>
         <el-button @click="tempTableDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="submitTempTable">确定</el-button>
@@ -630,16 +656,18 @@ onMounted(loadTables)
       <div class="clear-table-confirm">
         <el-icon :size="64" color="#e6a23c"><Warning /></el-icon>
         <div class="confirm-title">确认要清台吗？</div>
-        <div class="confirm-subtitle">{{ selectedClearTable?.name }} ({{ selectedClearTable?.tableNo }})</div>
+        <div class="confirm-subtitle">
+          {{ selectedClearTable?.name }} ({{ selectedClearTable?.tableNo }})
+        </div>
         <el-alert
           title="清台后将完成该桌台所有未结账订单，并将桌台恢复为空闲状态"
           type="warning"
           :closable="false"
           show-icon
-          style="margin-top: 15px; text-align: left;"
+          style="margin-top: 15px; text-align: left"
         />
       </div>
-      
+
       <template #footer>
         <el-button @click="clearTableDialogVisible = false">取消</el-button>
         <el-button type="danger" size="large" @click="confirmClearTable">确认清台</el-button>
@@ -762,9 +790,15 @@ onMounted(loadTables)
   width: 100%;
 }
 
-.bg-success { background: #67c23a; }
-.bg-danger { background: #f56c6c; }
-.bg-warning { background: #e6a23c; }
+.bg-success {
+  background: #67c23a;
+}
+.bg-danger {
+  background: #f56c6c;
+}
+.bg-warning {
+  background: #e6a23c;
+}
 
 .table-content {
   padding: 20px;

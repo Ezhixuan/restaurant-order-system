@@ -26,7 +26,7 @@ const tableNo = ref((route.query.tableNo as string) || cartStore.tableNo)
 // 如果没有桌台信息，尝试从订单列表获取
 const loadTableInfoFromOrder = async () => {
   if (tableId.value) return
-  
+
   // 尝试获取最近的一个活跃订单
   try {
     const orders = await getActiveOrders()
@@ -49,7 +49,7 @@ const loadOrder = async () => {
     showToast('桌台信息缺失')
     return
   }
-  
+
   loading.value = true
   try {
     const detail = await getOrderByTable(tableId.value)
@@ -100,21 +100,21 @@ const confirmAddDish = async () => {
     showToast('订单信息错误')
     return
   }
-  
+
   showLoadingToast({ message: '添加中...', forbidClick: true })
-  
+
   try {
     await addDishToOrder(order.value.id, {
       dishId: selectedDish.value.id,
       quantity: quantity.value,
-      remark: remark.value
+      remark: remark.value,
     })
-    
+
     closeToast()
     showToast('加菜成功')
     showAddDish.value = false
     selectedDish.value = null
-    
+
     // 刷新订单
     await loadOrder()
   } catch (error: any) {
@@ -133,7 +133,7 @@ const getStatusText = (status: number) => {
   const map: Record<number, string> = {
     0: '待制作',
     1: '制作中',
-    2: '已完成'
+    2: '已完成',
   }
   return map[status] || '未知'
 }
@@ -143,7 +143,7 @@ const getStatusColor = (status: number) => {
   const map: Record<number, string> = {
     0: 'gray',
     1: 'orange',
-    2: 'green'
+    2: 'green',
   }
   return map[status] || 'gray'
 }
@@ -178,7 +178,7 @@ onMounted(async () => {
         <span class="table-name">{{ order.tableNo }}号桌</span>
         <span class="order-no">{{ order.orderNo }}</span>
       </div>
-      
+
       <div class="info-meta">
         <span>{{ order.customerCount }}人用餐</span>
         <span>{{ items.length }}道菜</span>
@@ -188,23 +188,19 @@ onMounted(async () => {
     <!-- 菜品列表 -->
     <div class="items-section">
       <div class="section-title">已点菜品</div>
-      
+
       <div v-if="items.length > 0" class="items-list">
-        <div
-          v-for="item in items"
-          :key="item.id"
-          class="item-card"
-        >
+        <div v-for="item in items" :key="item.id" class="item-card">
           <div class="item-image">
             <img :src="item.dishImage || 'https://img.yzcdn.cn/vant/ipad.jpeg'" />
           </div>
-          
+
           <div class="item-info">
             <div class="item-name">{{ item.dishName }}</div>
             <div class="item-price">¥{{ item.price }} x {{ item.quantity }}</div>
             <div v-if="item.remark" class="item-remark">备注: {{ item.remark }}</div>
           </div>
-          
+
           <div class="item-status">
             <van-tag :type="getStatusColor(item.status)" size="medium">
               {{ getStatusText(item.status) }}
@@ -214,7 +210,7 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-      
+
       <van-empty v-else description="暂无菜品" />
     </div>
 
@@ -224,7 +220,7 @@ onMounted(async () => {
         <span class="total-label">合计</span>
         <span class="total-price">¥{{ totalAmount.toFixed(2) }}</span>
       </div>
-      
+
       <div class="actions">
         <van-button type="default" size="small" @click="goHome">返回首页</van-button>
         <van-button type="primary" size="small" @click="openAddDish">继续加菜</van-button>
@@ -241,48 +237,43 @@ onMounted(async () => {
     >
       <div class="add-dish-popup">
         <div class="popup-title">继续加菜</div>
-        
+
         <!-- 选择菜品 -->
         <div v-if="!selectedDish" class="dish-list">
-          <div
-            v-for="dish in dishes"
-            :key="dish.id"
-            class="dish-item"
-            @click="selectDish(dish)"
-          >
+          <div v-for="dish in dishes" :key="dish.id" class="dish-item" @click="selectDish(dish)">
             <div class="dish-image">
               <img :src="dish.image || 'https://img.yzcdn.cn/vant/ipad.jpeg'" />
-            </div>            
+            </div>
             <div class="dish-info">
               <div class="dish-name">{{ dish.name }}</div>
               <div class="dish-price">¥{{ dish.price }}</div>
             </div>
-            
+
             <van-icon name="add" class="add-icon" />
           </div>
         </div>
-        
+
         <!-- 确认添加 -->
         <div v-else class="confirm-add">
           <div class="selected-dish">
             <div class="dish-image">
               <img :src="selectedDish.image || 'https://img.yzcdn.cn/vant/ipad.jpeg'" />
-            </div>            
+            </div>
             <div class="dish-info">
               <div class="dish-name">{{ selectedDish.name }}</div>
               <div class="dish-price">¥{{ selectedDish.price }}</div>
             </div>
           </div>
-          
+
           <van-divider />
-          
+
           <div class="form-item">
-            <div class="label">数量</div>            
+            <div class="label">数量</div>
             <van-stepper v-model="quantity" :min="1" :max="99" />
           </div>
-          
+
           <div class="form-item">
-            <div class="label">备注</div>            
+            <div class="label">备注</div>
             <van-field
               v-model="remark"
               placeholder="请输入备注（如：少辣、免葱等）"
@@ -290,7 +281,7 @@ onMounted(async () => {
               show-word-limit
             />
           </div>
-          
+
           <div class="confirm-actions">
             <van-button type="default" block @click="selectedDish = null">重新选择</van-button>
             <van-button type="primary" block @click="confirmAddDish">

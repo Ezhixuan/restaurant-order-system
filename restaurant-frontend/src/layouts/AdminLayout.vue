@@ -54,13 +54,13 @@ const handleLogout = () => {
           <span>统计报表</span>
         </el-menu-item>
       </el-menu>
-      
+
       <div class="logout" @click="handleLogout">
         <el-icon><SwitchButton /></el-icon>
         <span>退出登录</span>
       </div>
     </el-aside>
-    
+
     <el-main class="main-content">
       <RouterView />
     </el-main>
@@ -107,7 +107,7 @@ const handleLogout = () => {
 
 .logout:hover {
   background-color: #263445;
-  color: #409EFF;
+  color: #409eff;
 }
 
 .main-content {

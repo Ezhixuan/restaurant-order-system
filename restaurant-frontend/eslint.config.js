@@ -20,6 +20,8 @@ export default [
         setInterval: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
+        WebSocket: 'readonly',
+        Audio: 'readonly',
       },
       parserOptions: {
         parser: '@typescript-eslint/parser',

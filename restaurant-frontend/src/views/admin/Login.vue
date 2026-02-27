@@ -10,7 +10,7 @@ const authStore = useAuthStore()
 
 const form = ref({
   username: '',
-  password: ''
+  password: '',
 })
 
 const loading = ref(false)
@@ -20,7 +20,7 @@ const handleLogin = async () => {
     ElMessage.warning('请输入用户名和密码')
     return
   }
-  
+
   loading.value = true
   try {
     const res = await login(form.value)
@@ -29,7 +29,7 @@ const handleLogin = async () => {
       userId: res.userId,
       username: res.username,
       realName: res.realName,
-      role: res.role
+      role: res.role,
     }
     ElMessage.success('登录成功')
     router.push('/admin/dashboard')
@@ -47,20 +47,16 @@ const handleLogin = async () => {
       <template #header>
         <div class="login-header">餐厅管理系统</div>
       </template>
-      
+
       <el-form :model="form" @submit.prevent="handleLogin">
         <el-form-item>
-          <el-input
-            v-model="form.username"
-            placeholder="用户名"
-            size="large"
-          >
+          <el-input v-model="form.username" placeholder="用户名" size="large">
             <template #prefix>
               <el-icon><User /></el-icon>
             </template>
           </el-input>
         </el-form-item>
-        
+
         <el-form-item>
           <el-input
             v-model="form.password"
@@ -74,14 +70,14 @@ const handleLogin = async () => {
             </template>
           </el-input>
         </el-form-item>
-        
+
         <el-form-item>
           <el-button
             type="primary"
             size="large"
             :loading="loading"
-            @click="handleLogin"
             style="width: 100%"
+            @click="handleLogin"
           >
             登录
           </el-button>

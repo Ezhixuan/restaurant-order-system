@@ -28,7 +28,7 @@ const dishForm = ref({
   price: 0,
   image: '',
   stock: 999,
-  sortOrder: 0
+  sortOrder: 0,
 })
 
 // 规格配置
@@ -50,11 +50,11 @@ const loadCategories = async () => {
 
 const loadDishes = async () => {
   const data = await dishApi.getDishesByCategory()
-  dishes.value = data.flatMap((cat: any) => 
+  dishes.value = data.flatMap((cat: any) =>
     (cat.dishes || []).map((dish: any) => ({
       ...dish,
       categoryId: cat.id,
-      categoryName: cat.name
+      categoryName: cat.name,
     }))
   )
 }
@@ -105,7 +105,9 @@ const submitCategory = async () => {
 
 const handleDeleteCategory = async (cat: any) => {
   try {
-    await ElMessageBox.confirm('确定删除该分类吗？分类下的菜品将无分类', '提示', { type: 'warning' })
+    await ElMessageBox.confirm('确定删除该分类吗？分类下的菜品将无分类', '提示', {
+      type: 'warning',
+    })
     await dishApi.deleteCategory(cat.id)
     await loadCategories()
     ElMessage.success('删除成功')
@@ -127,7 +129,7 @@ const showAddDish = () => {
     price: 0,
     image: '',
     stock: 999,
-    sortOrder: 0
+    sortOrder: 0,
   }
   dishDialogVisible.value = true
 }
@@ -195,7 +197,7 @@ const handlePriceChange = async (dish: any, newPrice: number) => {
 const showSpecConfig = async (dish: any) => {
   currentDish.value = dish
   hasSpecs.value = dish.hasSpecs === 1
-  
+
   if (hasSpecs.value) {
     try {
       const detail = await dishApi.getDishDetail(dish.id)
@@ -206,7 +208,7 @@ const showSpecConfig = async (dish: any) => {
   } else {
     specList.value = []
   }
-  
+
   specDialogVisible.value = true
 }
 
@@ -215,7 +217,7 @@ const addSpec = () => {
     name: '',
     price: 0,
     sortOrder: specList.value.length,
-    status: 1
+    status: 1,
   })
 }
 
@@ -229,11 +231,11 @@ const removeSpec = (index: number) => {
 const moveSpec = (index: number, direction: number) => {
   const newIndex = index + direction
   if (newIndex < 0 || newIndex >= specList.value.length) return
-  
+
   const temp = specList.value[index]
   specList.value[index] = specList.value[newIndex]
   specList.value[newIndex] = temp
-  
+
   specList.value.forEach((spec, idx) => {
     spec.sortOrder = idx
   })
@@ -246,13 +248,13 @@ const submitSpecs = async () => {
       ElMessage.warning('请至少添加一个有效的规格')
       return
     }
-    
+
     const names = validSpecs.map(s => s.name)
     if (new Set(names).size !== names.length) {
       ElMessage.warning('规格名称不能重复')
       return
     }
-    
+
     try {
       await dishSpecApi.batchUpdateSpecs(currentDish.value.id, validSpecs)
       specDialogVisible.value = false
@@ -279,7 +281,7 @@ const getCategoryName = (id: number) => {
 </script>
 
 <template>
-  <div class="pad-dish-management" v-loading="loading">
+  <div v-loading="loading" class="pad-dish-management">
     <!-- 顶部操作栏 -->
     <div class="header">
       <div class="header-left">
@@ -301,16 +303,16 @@ const getCategoryName = (id: number) => {
     <div class="main-content">
       <!-- 左侧分类 -->
       <aside class="category-sidebar">
-        <div 
-          class="category-item" 
+        <div
+          class="category-item"
           :class="{ active: activeCategory === 0 }"
           @click="activeCategory = 0"
         >
           <span>全部菜品</span>
           <span class="count">{{ dishes.length }}</span>
         </div>
-        <div 
-          v-for="cat in categories" 
+        <div
+          v-for="cat in categories"
           :key="cat.id"
           class="category-item"
           :class="{ active: activeCategory === cat.id }"
@@ -326,10 +328,10 @@ const getCategoryName = (id: number) => {
       <!-- 右侧菜品列表 -->
       <main class="dish-list">
         <el-empty v-if="filteredDishes.length === 0" description="暂无菜品" />
-        
+
         <div v-else class="dish-grid">
-          <el-card 
-            v-for="dish in filteredDishes" 
+          <el-card
+            v-for="dish in filteredDishes"
             :key="dish.id"
             class="dish-card"
             :class="{ 'is-off': dish.status === 0 }"
@@ -338,53 +340,55 @@ const getCategoryName = (id: number) => {
               <img :src="dish.image || 'https://img.yzcdn.cn/vant/ipad.jpeg'" />
               <div v-if="dish.status === 0" class="off-badge">已下架</div>
             </div>
-            
+
             <div class="dish-info">
               <div class="dish-name">{{ dish.name }}</div>
               <div class="dish-category">{{ getCategoryName(dish.categoryId) }}</div>
-              
+
               <!-- 价格显示 -->
               <div class="dish-price-section">
                 <div v-if="dish.hasSpecs === 1" class="specs-info">
                   <div class="price-range">
-                    ¥{{ Math.min(...dish.specs?.map((s: any) => s.price) || [0]) }} 
-                    ~ 
-                    ¥{{ Math.max(...dish.specs?.map((s: any) => s.price) || [0]) }}
+                    ¥{{ Math.min(...(dish.specs?.map((s: any) => s.price) || [0])) }} ~ ¥{{
+                      Math.max(...(dish.specs?.map((s: any) => s.price) || [0]))
+                    }}
                   </div>
                   <div class="spec-tags">
-                    <el-tag 
-                      v-for="spec in dish.specs?.slice(0, 3)" 
+                    <el-tag
+                      v-for="spec in dish.specs?.slice(0, 3)"
                       :key="spec.id"
                       size="small"
                       type="info"
                     >
                       {{ spec.name }}
                     </el-tag>
-                    <el-tag v-if="(dish.specs?.length || 0) > 3" size="small">+{{ dish.specs.length - 3 }}</el-tag>
+                    <el-tag v-if="(dish.specs?.length || 0) > 3" size="small"
+                      >+{{ dish.specs.length - 3 }}</el-tag
+                    >
                   </div>
                 </div>
                 <div v-else class="single-price">
-                  <el-input-number 
-                    v-model="dish.price" 
-                    :min="0" 
+                  <el-input-number
+                    v-model="dish.price"
+                    :min="0"
                     :precision="2"
                     size="small"
                     @change="(val: number) => handlePriceChange(dish, val)"
                   />
                 </div>
               </div>
-              
+
               <div class="dish-actions">
                 <el-button size="small" @click="showEditDish(dish)">编辑</el-button>
-                <el-button 
-                  size="small" 
+                <el-button
+                  size="small"
                   :type="dish.hasSpecs === 1 ? 'primary' : 'default'"
                   @click="showSpecConfig(dish)"
                 >
                   {{ dish.hasSpecs === 1 ? '配置规格' : '添加规格' }}
                 </el-button>
-                <el-button 
-                  size="small" 
+                <el-button
+                  size="small"
                   :type="dish.status === 1 ? 'danger' : 'success'"
                   @click="handleToggleStatus(dish)"
                 >
@@ -398,7 +402,11 @@ const getCategoryName = (id: number) => {
     </div>
 
     <!-- 分类编辑弹窗 -->
-    <el-dialog v-model="categoryDialogVisible" :title="isEditCategory ? '编辑分类' : '添加分类'" width="400px">
+    <el-dialog
+      v-model="categoryDialogVisible"
+      :title="isEditCategory ? '编辑分类' : '添加分类'"
+      width="400px"
+    >
       <el-form :model="categoryForm" label-width="80px">
         <el-form-item label="分类名称">
           <el-input v-model="categoryForm.name" placeholder="请输入分类名称" />
@@ -414,33 +422,32 @@ const getCategoryName = (id: number) => {
     </el-dialog>
 
     <!-- 菜品编辑弹窗 -->
-    <el-dialog v-model="dishDialogVisible" :title="isEditDish ? '编辑菜品' : '添加菜品'" width="500px">
+    <el-dialog
+      v-model="dishDialogVisible"
+      :title="isEditDish ? '编辑菜品' : '添加菜品'"
+      width="500px"
+    >
       <el-form :model="dishForm" label-width="80px">
         <el-form-item label="菜品名称">
           <el-input v-model="dishForm.name" placeholder="请输入菜品名称" />
         </el-form-item>
-        
+
         <el-form-item label="分类">
           <el-select v-model="dishForm.categoryId" placeholder="选择分类">
-            <el-option 
-              v-for="cat in categories" 
-              :key="cat.id" 
-              :label="cat.name" 
-              :value="cat.id" 
-            />
+            <el-option v-for="cat in categories" :key="cat.id" :label="cat.name" :value="cat.id" />
           </el-select>
         </el-form-item>
-        
+
         <el-form-item label="基础价格">
           <el-input-number v-model="dishForm.price" :min="0" :precision="2" />
           <span class="tip">添加规格后，此价格将被规格价格替代</span>
         </el-form-item>
-        
+
         <el-form-item label="库存">
           <el-input-number v-model="dishForm.stock" :min="-1" />
           <span class="tip">-1 表示不限</span>
         </el-form-item>
-        
+
         <el-form-item label="描述">
           <el-input v-model="dishForm.description" type="textarea" rows="3" />
         </el-form-item>
@@ -466,12 +473,16 @@ const getCategoryName = (id: number) => {
           <div v-for="(spec, index) in specList" :key="index" class="spec-item">
             <el-input v-model="spec.name" placeholder="规格名称(如:小份)" style="width: 150px" />
             <el-input-number v-model="spec.price" :min="0" :precision="2" placeholder="价格" />
-            
+
             <el-button-group>
               <el-button size="small" :disabled="index === 0" @click="moveSpec(index, -1)">
                 <el-icon><ArrowUp /></el-icon>
               </el-button>
-              <el-button size="small" :disabled="index === specList.length - 1" @click="moveSpec(index, 1)">
+              <el-button
+                size="small"
+                :disabled="index === specList.length - 1"
+                @click="moveSpec(index, 1)"
+              >
                 <el-icon><ArrowDown /></el-icon>
               </el-button>
               <el-button size="small" type="danger" @click="removeSpec(index)">
@@ -479,28 +490,24 @@ const getCategoryName = (id: number) => {
               </el-button>
             </el-button-group>
           </div>
-          
-          <el-button type="primary" plain @click="addSpec" class="add-spec-btn">
+
+          <el-button type="primary" plain class="add-spec-btn" @click="addSpec">
             <el-icon><Plus /></el-icon>添加规格
           </el-button>
-          
-          <el-alert 
-            v-if="specList.length === 0" 
-            title="请至少添加一个规格" 
-            type="info" 
-            :closable="false" 
-          />
-        </div>
-        
-        <div v-else class="single-mode-tip">
+
           <el-alert
-            title="当前为单价格模式，使用菜品基础价格"
+            v-if="specList.length === 0"
+            title="请至少添加一个规格"
             type="info"
             :closable="false"
           />
         </div>
+
+        <div v-else class="single-mode-tip">
+          <el-alert title="当前为单价格模式，使用菜品基础价格" type="info" :closable="false" />
+        </div>
       </div>
-      
+
       <template #footer>
         <el-button @click="specDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="submitSpecs">保存</el-button>

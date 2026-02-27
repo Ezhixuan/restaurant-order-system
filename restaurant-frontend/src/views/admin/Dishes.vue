@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getCategories, createCategory, updateCategory, deleteCategory, getDishesByCategory, createDish, updateDish, deleteDish, toggleDishStatus } from '@/api/dish'
+import {
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  getDishesByCategory,
+  createDish,
+  updateDish,
+  deleteDish,
+  toggleDishStatus,
+} from '@/api/dish'
 import type { UploadProps } from 'element-plus'
 
 // 分类管理
@@ -24,13 +34,13 @@ const dishForm = ref({
   image: '',
   stock: 999,
   isRecommend: 0,
-  sortOrder: 0
+  sortOrder: 0,
 })
 
 const activeTab = ref('dishes')
 
 const uploadHeaders = {
-  Authorization: `Bearer ${localStorage.getItem('token') || ''}`
+  Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
 }
 
 const loadCategories = async () => {
@@ -45,7 +55,7 @@ const loadDishes = async () => {
     dishes.value = data.flatMap((cat: any) =>
       (cat.dishes || []).map((dish: any) => ({
         ...dish,
-        categoryId: cat.id
+        categoryId: cat.id,
       }))
     )
   } finally {
@@ -99,9 +109,15 @@ const handleSubmitCategory = async () => {
 const handleAddDish = () => {
   isEditDish.value = false
   dishForm.value = {
-    id: null, categoryId: categories.value[0]?.id || null,
-    name: '', description: '', price: 0, image: '',
-    stock: 999, isRecommend: 0, sortOrder: 0
+    id: null,
+    categoryId: categories.value[0]?.id || null,
+    name: '',
+    description: '',
+    price: 0,
+    image: '',
+    stock: 999,
+    isRecommend: 0,
+    sortOrder: 0,
   }
   dishDialogVisible.value = true
 }
@@ -151,7 +167,7 @@ const getCategoryName = (id: number) => {
   return categories.value.find(c => c.id === id)?.name || '-'
 }
 
-const handleImageUpload: UploadProps['onSuccess'] = (response) => {
+const handleImageUpload: UploadProps['onSuccess'] = response => {
   if (response.code === 200) {
     dishForm.value.image = response.data
     ElMessage.success('图片上传成功')
@@ -160,7 +176,7 @@ const handleImageUpload: UploadProps['onSuccess'] = (response) => {
   }
 }
 
-const beforeImageUpload: UploadProps['beforeUpload'] = (file) => {
+const beforeImageUpload: UploadProps['beforeUpload'] = file => {
   const isJPG = file.type === 'image/jpeg'
   const isPNG = file.type === 'image/png'
   const isLt2M = file.size / 1024 / 1024 < 2
@@ -191,8 +207,8 @@ onMounted(() => {
           <h3>菜品列表</h3>
           <el-button type="primary" @click="handleAddDish">添加菜品</el-button>
         </div>
-        
-        <el-table :data="dishes" v-loading="loading" border>
+
+        <el-table v-loading="loading" :data="dishes" border>
           <el-table-column prop="name" label="菜品名称" />
           <el-table-column prop="categoryId" label="分类" width="120">
             <template #default="{ row }">{{ getCategoryName(row.categoryId) }}</template>
@@ -207,14 +223,13 @@ onMounted(() => {
                     </div>
                   </template>
                   <span class="spec-price">
-                    ¥{{ Math.min(...row.specs.map(s => s.price)) }} ~ 
-                    ¥{{ Math.max(...row.specs.map(s => s.price)) }}
+                    ¥{{ Math.min(...row.specs.map(s => s.price)) }} ~ ¥{{
+                      Math.max(...row.specs.map(s => s.price))
+                    }}
                   </span>
                 </el-tooltip>
               </template>
-              <template v-else>
-                ¥{{ row.price }}
-              </template>
+              <template v-else> ¥{{ row.price }} </template>
             </template>
           </el-table-column>
           <el-table-column label="规格" width="100">
@@ -255,14 +270,16 @@ onMounted(() => {
           <h3>分类列表</h3>
           <el-button type="primary" @click="handleAddCategory">添加分类</el-button>
         </div>
-        
+
         <el-table :data="categories" border>
           <el-table-column prop="name" label="分类名称" />
           <el-table-column prop="sortOrder" label="排序" width="100" />
           <el-table-column label="操作" width="180">
             <template #default="{ row }">
               <el-button size="small" @click="handleEditCategory(row)">编辑</el-button>
-              <el-button size="small" type="danger" @click="handleDeleteCategory(row)">删除</el-button>
+              <el-button size="small" type="danger" @click="handleDeleteCategory(row)"
+                >删除</el-button
+              >
             </template>
           </el-table-column>
         </el-table>
@@ -286,7 +303,11 @@ onMounted(() => {
     </el-dialog>
 
     <!-- 菜品对话框 -->
-    <el-dialog v-model="dishDialogVisible" :title="isEditDish ? '编辑菜品' : '添加菜品'" width="600px">
+    <el-dialog
+      v-model="dishDialogVisible"
+      :title="isEditDish ? '编辑菜品' : '添加菜品'"
+      width="600px"
+    >
       <el-form :model="dishForm" label-width="100px">
         <el-form-item label="菜品名称">
           <el-input v-model="dishForm.name" />

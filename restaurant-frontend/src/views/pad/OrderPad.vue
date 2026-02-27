@@ -14,7 +14,7 @@ const cartStore = useCartStore()
 // 从购物车store或route.query获取桌台信息
 const tableIdFromQuery = Number(route.query.tableId) || 0
 const tableId = computed(() => cartStore.tableId || tableIdFromQuery)
-const tableNo = computed(() => cartStore.tableNo || route.query.tableNo as string || '')
+const tableNo = computed(() => cartStore.tableNo || (route.query.tableNo as string) || '')
 
 // 顾客人数
 const customerCount = computed(() => {
@@ -91,7 +91,7 @@ const handleDishClick = (dish: any) => {
 // 添加规格商品到购物车
 const addSpecToCart = () => {
   if (!currentDish.value || !selectedSpec.value) return
-  
+
   cartStore.addItem({
     dishId: currentDish.value.id,
     specId: selectedSpec.value.id,
@@ -100,9 +100,9 @@ const addSpecToCart = () => {
     price: selectedSpec.value.price,
     image: currentDish.value.image,
     quantity: specQuantity.value,
-    remark: specRemark.value
+    remark: specRemark.value,
   })
-  
+
   specDialogVisible.value = false
   ElMessage.success(`已添加 ${currentDish.value.name} (${selectedSpec.value.name})`)
 }
@@ -114,7 +114,7 @@ const addToCart = (dish: any) => {
     name: dish.name,
     price: dish.price,
     image: dish.image,
-    quantity: 1
+    quantity: 1,
   })
   ElMessage.success(`已添加 ${dish.name}`)
 }
@@ -155,22 +155,22 @@ const submitOrder = async () => {
         items: cartStore.items.map(item => ({
           dishId: item.dishId,
           quantity: item.quantity,
-          remark: item.remark || ''
-        }))
+          remark: item.remark || '',
+        })),
       }
 
       await batchAddDishToOrder(addDishData)
       ElMessage.success('加菜成功')
-      
+
       cartStore.clearCart()
       orderRemark.value = ''
-      
+
       router.push({
         path: '/pad/orders',
-        query: { 
+        query: {
           tableId: tableId.value,
-          tableNo: tableNo.value
-        }
+          tableNo: tableNo.value,
+        },
       })
     } else {
       // 新订单模式
@@ -185,34 +185,36 @@ const submitOrder = async () => {
           dishImage: item.image,
           price: item.price,
           quantity: item.quantity,
-          remark: item.remark || ''
+          remark: item.remark || '',
         })),
-        remark: orderRemark.value
+        remark: orderRemark.value,
       }
 
       const order = await createOrder(orderData)
       ElMessage.success('下单成功')
-      
+
       const currentTableId = tableId.value
       const currentTableNo = tableNo.value
-      
+
       cartStore.clearCart()
       orderRemark.value = ''
-      
+
       await ElMessageBox.confirm('下单成功！是否查看订单？', '提示', {
         confirmButtonText: '查看订单',
-        cancelButtonText: '返回桌台'
-      }).then(() => {
-        router.push({
-          path: '/pad/orders',
-          query: { 
-            tableId: currentTableId,
-            tableNo: currentTableNo
-          }
-        })
-      }).catch(() => {
-        router.push('/pad/tables')
+        cancelButtonText: '返回桌台',
       })
+        .then(() => {
+          router.push({
+            path: '/pad/orders',
+            query: {
+              tableId: currentTableId,
+              tableNo: currentTableNo,
+            },
+          })
+        })
+        .catch(() => {
+          router.push('/pad/tables')
+        })
     }
   } catch (error: any) {
     ElMessage.error(error.message || (isAddMode.value ? '加菜失败' : '下单失败'))
@@ -237,18 +239,20 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="order-pad" v-loading="loading">
+  <div v-loading="loading" class="order-pad">
     <!-- 顶部信息栏 -->
     <div class="header">
       <div class="header-left">
-        <el-button @click="goBack" icon="ArrowLeft">返回</el-button>
+        <el-button icon="ArrowLeft" @click="goBack">返回</el-button>
         <span class="table-info">
           桌号: {{ tableNo }} | 人数: {{ customerCount }}人
-          <el-tag v-if="isAddMode" type="warning" style="margin-left: 10px;">加菜模式</el-tag>
+          <el-tag v-if="isAddMode" type="warning" style="margin-left: 10px">加菜模式</el-tag>
         </span>
       </div>
       <div class="header-right">
-        <el-tag v-if="currentOrder" type="warning">订单号: {{ currentOrder.order?.orderNo }}</el-tag>
+        <el-tag v-if="currentOrder" type="warning"
+          >订单号: {{ currentOrder.order?.orderNo }}</el-tag
+        >
       </div>
     </div>
 
@@ -271,7 +275,10 @@ onMounted(() => {
                 @click="handleDishClick(dish)"
               >
                 <div class="dish-image">
-                  <img :src="dish.image || 'https://img.yzcdn.cn/vant/ipad.jpeg'" :alt="dish.name" />
+                  <img
+                    :src="dish.image || 'https://img.yzcdn.cn/vant/ipad.jpeg'"
+                    :alt="dish.name"
+                  />
                   <el-tag v-if="dish.isRecommend" type="danger" class="recommend-tag">推荐</el-tag>
                   <el-tag v-if="dish.hasSpecs === 1" type="primary" class="spec-tag">多规格</el-tag>
                 </div>
@@ -281,9 +288,7 @@ onMounted(() => {
                     <template v-if="dish.hasSpecs === 1 && dish.specs?.length > 0">
                       ¥{{ Math.min(...dish.specs.map((s: any) => s.price)).toFixed(0) }} 起
                     </template>
-                    <template v-else>
-                      ¥{{ dish.price.toFixed(2) }}
-                    </template>
+                    <template v-else> ¥{{ dish.price.toFixed(2) }} </template>
                   </div>
                 </div>
               </el-card>
@@ -312,7 +317,11 @@ onMounted(() => {
 
           <!-- 购物车列表 -->
           <div v-if="cartStore.items.length > 0" class="cart-list">
-            <div v-for="item in cartStore.items" :key="item.dishId + '-' + (item.specId || 0)" class="cart-item">
+            <div
+              v-for="item in cartStore.items"
+              :key="item.dishId + '-' + (item.specId || 0)"
+              class="cart-item"
+            >
               <div class="item-info">
                 <div class="item-name">
                   {{ item.name }}
@@ -325,16 +334,18 @@ onMounted(() => {
                   size="small"
                   circle
                   @click="updateQuantity(item.dishId, item.quantity - 1, item.specId)"
-                >-</el-button>
+                  >-</el-button
+                >
                 <span class="quantity">{{ item.quantity }}</span>
                 <el-button
                   size="small"
                   circle
                   @click="updateQuantity(item.dishId, item.quantity + 1, item.specId)"
-                >+</el-button>
+                  >+</el-button
+                >
               </div>
             </div>
-            
+
             <!-- 订单备注 -->
             <div class="remark-section">
               <div class="remark-label">订单备注</div>
@@ -362,10 +373,12 @@ onMounted(() => {
               size="large"
               :loading="submitting"
               :disabled="cartStore.items.length === 0"
-              @click="submitOrder"
               style="width: 100%"
+              @click="submitOrder"
             >
-              {{ isAddMode ? '确认加菜' : '提交订单' }} ({{ cartStore.items.reduce((sum, i) => sum + i.quantity, 0) }})
+              {{ isAddMode ? '确认加菜' : '提交订单' }} ({{
+                cartStore.items.reduce((sum, i) => sum + i.quantity, 0)
+              }})
             </el-button>
           </div>
         </el-card>
@@ -373,21 +386,13 @@ onMounted(() => {
     </div>
 
     <!-- 规格选择弹窗 -->
-    <el-dialog
-      v-model="specDialogVisible"
-      :title="currentDish?.name"
-      width="400px"
-    >
+    <el-dialog v-model="specDialogVisible" :title="currentDish?.name" width="400px">
       <div v-if="currentDish" class="spec-dialog-content">
         <div class="spec-section">
           <div class="section-label">选择规格</div>
           <div class="spec-options">
             <el-radio-group v-model="selectedSpec">
-              <el-radio-button
-                v-for="spec in currentDish.specs"
-                :key="spec.id"
-                :label="spec"
-              >
+              <el-radio-button v-for="spec in currentDish.specs" :key="spec.id" :label="spec">
                 {{ spec.name }} ¥{{ spec.price.toFixed(0) }}
               </el-radio-button>
             </el-radio-group>
@@ -401,14 +406,10 @@ onMounted(() => {
 
         <div class="remark-section">
           <div class="section-label">备注</div>
-          <el-input
-            v-model="specRemark"
-            placeholder="口味要求等"
-            maxlength="50"
-          />
+          <el-input v-model="specRemark" placeholder="口味要求等" maxlength="50" />
         </div>
 
-        <div class="spec-summary" v-if="selectedSpec">
+        <div v-if="selectedSpec" class="spec-summary">
           <div class="summary-row">
             <span>单价: ¥{{ selectedSpec.price.toFixed(2) }}</span>
             <span>× {{ specQuantity }}</span>
@@ -421,11 +422,7 @@ onMounted(() => {
 
       <template #footer>
         <el-button @click="specDialogVisible = false">取消</el-button>
-        <el-button
-          type="primary"
-          :disabled="!selectedSpec"
-          @click="addSpecToCart"
-        >
+        <el-button type="primary" :disabled="!selectedSpec" @click="addSpecToCart">
           加入购物车
         </el-button>
       </template>

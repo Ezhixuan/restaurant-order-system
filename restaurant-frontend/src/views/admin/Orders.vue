@@ -1,14 +1,21 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getOrders, getOrderDetail, payOrder, completeOrder, cancelOrder, updateItemStatus } from '@/api/order'
+import {
+  getOrders,
+  getOrderDetail,
+  payOrder,
+  completeOrder,
+  cancelOrder,
+  updateItemStatus,
+} from '@/api/order'
 import { getTodayStats, getTopDishes, getTableStats } from '@/api/report'
 
 // 统计数据
 const todayStats = ref({
   totalRevenue: 0,
   orderCount: 0,
-  avgAmount: 0
+  avgAmount: 0,
 })
 
 const topDishes = ref<any[]>([])
@@ -30,16 +37,16 @@ const statusOptions = [
   { label: '上菜中', value: 1 },
   { label: '待结账', value: 2 },
   { label: '已完成', value: 3 },
-  { label: '已取消', value: 4 }
+  { label: '已取消', value: 4 },
 ]
 
 const getStatusType = (status: number) => {
   const map: Record<number, string> = {
-    0: 'info',      // 待上菜 - 灰色
-    1: 'warning',   // 上菜中 - 橙色
-    2: 'primary',   // 待结账 - 蓝色
-    3: 'success',   // 已完成 - 绿色
-    4: 'danger'     // 已取消 - 红色
+    0: 'info', // 待上菜 - 灰色
+    1: 'warning', // 上菜中 - 橙色
+    2: 'primary', // 待结账 - 蓝色
+    3: 'success', // 已完成 - 绿色
+    4: 'danger', // 已取消 - 红色
   }
   return map[status] || 'info'
 }
@@ -50,7 +57,7 @@ const getStatusLabel = (status: number) => {
     1: '上菜中',
     2: '待结账',
     3: '已完成',
-    4: '已取消'
+    4: '已取消',
   }
   return map[status] || '未知'
 }
@@ -100,7 +107,7 @@ const showDetail = async (order: any) => {
 const handlePay = async (order: any) => {
   try {
     await ElMessageBox.confirm(`确认订单 ${order.orderNo} 已收款？`, '确认收款', {
-      type: 'warning'
+      type: 'warning',
     })
     await payOrder(order.id, { payType: 3, amount: order.payAmount }) // 3=现金
     ElMessage.success('收款成功')
@@ -115,7 +122,7 @@ const handlePay = async (order: any) => {
 const handleComplete = async (order: any) => {
   try {
     await ElMessageBox.confirm(`确认完成订单 ${order.orderNo}？`, '确认完成', {
-      type: 'warning'
+      type: 'warning',
     })
     await completeOrder(order.id)
     ElMessage.success('订单已完成')
@@ -130,7 +137,7 @@ const handleComplete = async (order: any) => {
 const handleCancel = async (order: any) => {
   try {
     await ElMessageBox.confirm(`确认取消订单 ${order.orderNo}？`, '确认取消', {
-      type: 'danger'
+      type: 'danger',
     })
     await cancelOrder(order.id)
     ElMessage.success('订单已取消')
@@ -176,7 +183,9 @@ onMounted(() => {
       <el-col :span="8">
         <el-card>
           <div class="stat-title">今日营业额</div>
-          <div class="stat-value text-success">¥{{ todayStats.totalRevenue?.toFixed(2) || '0.00' }}</div>
+          <div class="stat-value text-success">
+            ¥{{ todayStats.totalRevenue?.toFixed(2) || '0.00' }}
+          </div>
         </el-card>
       </el-col>
       <el-col :span="8">
@@ -188,7 +197,9 @@ onMounted(() => {
       <el-col :span="8">
         <el-card>
           <div class="stat-title">平均客单价</div>
-          <div class="stat-value text-warning">¥{{ todayStats.avgAmount?.toFixed(2) || '0.00' }}</div>
+          <div class="stat-value text-warning">
+            ¥{{ todayStats.avgAmount?.toFixed(2) || '0.00' }}
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -209,14 +220,16 @@ onMounted(() => {
         </div>
       </template>
 
-      <el-table :data="filteredOrders" v-loading="loading" border stripe>
+      <el-table v-loading="loading" :data="filteredOrders" border stripe>
         <el-table-column prop="orderNo" label="订单号" width="180" />
         <el-table-column prop="tableNo" label="桌号" width="100" />
         <el-table-column prop="customerCount" label="人数" width="80" />
         <el-table-column prop="totalAmount" label="金额" width="120">
           <template #default="{ row }">
             <div>总价: ¥{{ row.totalAmount?.toFixed(2) }}</div>
-            <div v-if="row.discountAmount > 0" class="discount">优惠: ¥{{ row.discountAmount?.toFixed(2) }}</div>
+            <div v-if="row.discountAmount > 0" class="discount">
+              优惠: ¥{{ row.discountAmount?.toFixed(2) }}
+            </div>
             <div class="pay-amount">实付: ¥{{ row.payAmount?.toFixed(2) }}</div>
           </template>
         </el-table-column>
@@ -229,20 +242,10 @@ onMounted(() => {
         <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="showDetail(row)">详情</el-button>
-            <el-button
-              v-if="row.status === 2"
-              size="small"
-              type="success"
-              @click="handlePay(row)"
-            >
+            <el-button v-if="row.status === 2" size="small" type="success" @click="handlePay(row)">
               收款
             </el-button>
-            <el-button
-              v-if="row.status < 2"
-              size="small"
-              type="danger"
-              @click="handleCancel(row)"
-            >
+            <el-button v-if="row.status < 2" size="small" type="danger" @click="handleCancel(row)">
               取消
             </el-button>
           </template>
@@ -254,15 +257,13 @@ onMounted(() => {
     <el-dialog v-model="detailVisible" title="订单详情" width="700px">
       <div v-if="currentOrder" class="order-detail">
         <div class="detail-header">
-          <div>
-            <span class="label">订单号:</span> {{ currentOrder.orderNo }}
-          </div>
-          <div>
-            <span class="label">桌号:</span> {{ currentOrder.tableNo }}
-          </div>
+          <div><span class="label">订单号:</span> {{ currentOrder.orderNo }}</div>
+          <div><span class="label">桌号:</span> {{ currentOrder.tableNo }}</div>
           <div>
             <span class="label">状态:</span>
-            <el-tag :type="getStatusType(currentOrder.status)">{{ getStatusLabel(currentOrder.status) }}</el-tag>
+            <el-tag :type="getStatusType(currentOrder.status)">{{
+              getStatusLabel(currentOrder.status)
+            }}</el-tag>
           </div>
         </div>
 
@@ -271,11 +272,11 @@ onMounted(() => {
         <!-- 订单明细 -->
         <el-table :data="currentItems" border size="small">
           <el-table-column prop="dishName" label="菜品">
-          <template #default="{ row }">
-            {{ row.dishName }}
-            <el-tag v-if="row.specName" type="info" size="small">{{ row.specName }}</el-tag>
-          </template>
-        </el-table-column>
+            <template #default="{ row }">
+              {{ row.dishName }}
+              <el-tag v-if="row.specName" type="info" size="small">{{ row.specName }}</el-tag>
+            </template>
+          </el-table-column>
           <el-table-column prop="price" label="单价" width="100">
             <template #default="{ row }">¥{{ row.price?.toFixed(2) }}</template>
           </el-table-column>
@@ -293,8 +294,12 @@ onMounted(() => {
           <el-table-column label="操作" width="150">
             <template #default="{ row }">
               <el-button-group size="small">
-                <el-button v-if="row.status === 0" @click="handleUpdateItemStatus(row, 1)">制作</el-button>
-                <el-button v-if="row.status === 1" @click="handleUpdateItemStatus(row, 2)">完成</el-button>
+                <el-button v-if="row.status === 0" @click="handleUpdateItemStatus(row, 1)"
+                  >制作</el-button
+                >
+                <el-button v-if="row.status === 1" @click="handleUpdateItemStatus(row, 2)"
+                  >完成</el-button
+                >
               </el-button-group>
             </template>
           </el-table-column>
@@ -303,9 +308,7 @@ onMounted(() => {
         <el-divider />
 
         <div class="detail-footer">
-          <div>
-            <span class="label">下单时间:</span> {{ currentOrder.createdAt }}
-          </div>
+          <div><span class="label">下单时间:</span> {{ currentOrder.createdAt }}</div>
           <div class="total-amount">
             <span>合计: </span>
             <span class="amount">¥{{ currentOrder.payAmount?.toFixed(2) }}</span>

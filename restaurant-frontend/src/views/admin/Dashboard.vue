@@ -10,7 +10,7 @@ const router = useRouter()
 const todayStats = ref({
   totalRevenue: 0,
   orderCount: 0,
-  avgAmount: 0
+  avgAmount: 0,
 })
 
 const topDishes = ref<any[]>([])
@@ -28,13 +28,13 @@ const loadData = async () => {
       getTodayStats(),
       getTopDishes(5),
       getTableStats(),
-      getActiveOrders()
+      getActiveOrders(),
     ])
     todayStats.value = stats
     topDishes.value = dishes
     tableStats.value = tables
     recentOrders.value = orders.slice(0, 10) // 最近10条
-    
+
     // 初始化图表
     initRevenueChart()
   } catch (error) {
@@ -47,60 +47,78 @@ const loadData = async () => {
 const initRevenueChart = () => {
   const chartDom = document.getElementById('revenueChart')
   if (!chartDom) return
-  
+
   revenueChart = echarts.init(chartDom)
   const option = {
     grid: {
       left: '3%',
       right: '4%',
       bottom: '3%',
-      containLabel: true
+      containLabel: true,
     },
     xAxis: {
       type: 'category',
-      data: ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'],
+      data: [
+        '10:00',
+        '11:00',
+        '12:00',
+        '13:00',
+        '14:00',
+        '15:00',
+        '16:00',
+        '17:00',
+        '18:00',
+        '19:00',
+        '20:00',
+        '21:00',
+      ],
       axisLine: { lineStyle: { color: '#ddd' } },
-      axisLabel: { color: '#666' }
+      axisLabel: { color: '#666' },
     },
     yAxis: {
       type: 'value',
       axisLine: { lineStyle: { color: '#ddd' } },
       axisLabel: { color: '#666' },
-      splitLine: { lineStyle: { color: '#f0f0f0' } }
+      splitLine: { lineStyle: { color: '#f0f0f0' } },
     },
-    series: [{
-      data: [120, 280, 580, 920, 680, 420, 380, 520, 880, 1200, 980, 650],
-      type: 'line',
-      smooth: true,
-      symbol: 'circle',
-      symbolSize: 8,
-      lineStyle: {
-        color: '#409EFF',
-        width: 3
+    series: [
+      {
+        data: [120, 280, 580, 920, 680, 420, 380, 520, 880, 1200, 980, 650],
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 8,
+        lineStyle: {
+          color: '#409EFF',
+          width: 3,
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
+              { offset: 1, color: 'rgba(64, 158, 255, 0.05)' },
+            ],
+          },
+        },
+        itemStyle: { color: '#409EFF' },
       },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0, y: 0, x2: 0, y2: 1,
-          colorStops: [
-            { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
-            { offset: 1, color: 'rgba(64, 158, 255, 0.05)' }
-          ]
-        }
-      },
-      itemStyle: { color: '#409EFF' }
-    }]
+    ],
   }
   revenueChart.setOption(option)
 }
 
 const getStatusType = (status: number) => {
   const map: Record<number, string> = {
-    0: 'info',      // 待上菜
-    1: 'warning',   // 上菜中
-    2: 'primary',   // 待结账
-    3: 'success',   // 已完成
-    4: 'danger'     // 已取消
+    0: 'info', // 待上菜
+    1: 'warning', // 上菜中
+    2: 'primary', // 待结账
+    3: 'success', // 已完成
+    4: 'danger', // 已取消
   }
   return map[status] || 'info'
 }
@@ -111,7 +129,7 @@ const getStatusLabel = (status: number) => {
     1: '上菜中',
     2: '待结账',
     3: '已完成',
-    4: '已取消'
+    4: '已取消',
   }
   return map[status] || '未知'
 }
@@ -130,7 +148,7 @@ let refreshTimer: number | null = null
 onMounted(() => {
   loadData()
   refreshTimer = window.setInterval(loadData, 30000) // 30秒刷新
-  
+
   window.addEventListener('resize', () => {
     revenueChart?.resize()
   })
@@ -145,7 +163,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="dashboard" v-loading="loading">
+  <div v-loading="loading" class="dashboard">
     <!-- 快捷操作 -->
     <div class="quick-actions">
       <el-button type="primary" size="large" @click="goToKitchen">
@@ -167,7 +185,9 @@ onUnmounted(() => {
           </div>
           <div class="stat-content">
             <div class="stat-title">今日营业额</div>
-            <div class="stat-value text-success">¥{{ todayStats.totalRevenue?.toFixed(2) || '0.00' }}</div>
+            <div class="stat-value text-success">
+              ¥{{ todayStats.totalRevenue?.toFixed(2) || '0.00' }}
+            </div>
             <div class="stat-trend">
               <el-tag size="small" type="success">↑ 12.5%</el-tag>
               <span class="trend-text">较昨日</span>
@@ -175,7 +195,7 @@ onUnmounted(() => {
           </div>
         </el-card>
       </el-col>
-      
+
       <el-col :xs="24" :sm="8">
         <el-card class="stat-card" shadow="hover">
           <div class="stat-icon bg-primary">
@@ -191,7 +211,7 @@ onUnmounted(() => {
           </div>
         </el-card>
       </el-col>
-      
+
       <el-col :xs="24" :sm="8">
         <el-card class="stat-card" shadow="hover">
           <div class="stat-icon bg-warning">
@@ -199,7 +219,9 @@ onUnmounted(() => {
           </div>
           <div class="stat-content">
             <div class="stat-title">平均客单价</div>
-            <div class="stat-value text-warning">¥{{ todayStats.avgAmount?.toFixed(2) || '0.00' }}</div>
+            <div class="stat-value text-warning">
+              ¥{{ todayStats.avgAmount?.toFixed(2) || '0.00' }}
+            </div>
             <div class="stat-trend">
               <el-tag size="small" type="danger">↓ 2.1%</el-tag>
               <span class="trend-text">较昨日</span>
@@ -224,7 +246,7 @@ onUnmounted(() => {
               </el-radio-group>
             </div>
           </template>
-          <div id="revenueChart" style="height: 350px;"></div>
+          <div id="revenueChart" style="height: 350px"></div>
         </el-card>
       </el-col>
 
@@ -234,12 +256,12 @@ onUnmounted(() => {
           <template #header>
             <div class="card-header">
               <span class="card-title">📋 实时订单</span>
-              <el-tag type="danger" effect="dark" v-if="recentOrders.length > 0">
+              <el-tag v-if="recentOrders.length > 0" type="danger" effect="dark">
                 {{ recentOrders.length }} 进行中
               </el-tag>
             </div>
           </template>
-          
+
           <div class="orders-list">
             <div
               v-for="order in recentOrders"
@@ -258,14 +280,12 @@ onUnmounted(() => {
                 <span class="order-time">{{ new Date(order.createdAt).toLocaleTimeString() }}</span>
               </div>
             </div>
-            
+
             <el-empty v-if="recentOrders.length === 0" description="暂无进行中的订单" />
           </div>
-          
+
           <div class="orders-footer">
-            <el-button text type="primary" @click="goToOrders">
-              查看全部订单 →
-            </el-button>
+            <el-button text type="primary" @click="goToOrders"> 查看全部订单 → </el-button>
           </div>
         </el-card>
       </el-col>
@@ -279,13 +299,9 @@ onUnmounted(() => {
           <template #header>
             <span class="card-title">🔥 热销菜品 TOP5</span>
           </template>
-          
+
           <div class="dishes-ranking">
-            <div
-              v-for="(dish, index) in topDishes"
-              :key="index"
-              class="rank-item"
-            >
+            <div v-for="(dish, index) in topDishes" :key="index" class="rank-item">
               <div class="rank-number" :class="`rank-${index + 1}`">
                 {{ index + 1 }}
               </div>
@@ -294,7 +310,9 @@ onUnmounted(() => {
                 <div class="rank-bar">
                   <div
                     class="rank-progress"
-                    :style="{ width: `${(dish.totalQuantity / topDishes[0].totalQuantity) * 100}%` }"
+                    :style="{
+                      width: `${(dish.totalQuantity / topDishes[0].totalQuantity) * 100}%`,
+                    }"
                   ></div>
                 </div>
               </div>
@@ -318,7 +336,7 @@ onUnmounted(() => {
               </el-button>
             </div>
           </template>
-          
+
           <el-table :data="tableStats" size="small" stripe>
             <el-table-column type="index" width="50" />
             <el-table-column prop="tableNo" label="桌号" width="80" />
@@ -344,9 +362,9 @@ onUnmounted(() => {
 export default {
   data() {
     return {
-      timeRange: 'today'
+      timeRange: 'today',
     }
-  }
+  },
 }
 </script>
 
@@ -481,8 +499,13 @@ export default {
 }
 
 @keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.4); }
-  50% { box-shadow: 0 0 0 10px rgba(255, 152, 0, 0); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(255, 152, 0, 0);
+  }
 }
 
 .order-main {

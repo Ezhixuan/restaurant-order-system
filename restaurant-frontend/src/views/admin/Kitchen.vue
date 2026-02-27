@@ -16,19 +16,19 @@ const sortOrder = ref('asc') // 'asc' | 'desc'
 const connectWebSocket = () => {
   const token = localStorage.getItem('token')
   const wsUrl = `ws://localhost:8080/ws/kitchen?token=${token}`
-  
+
   ws = new WebSocket(wsUrl)
-  
+
   ws.onopen = () => {
     wsConnected.value = true
     ElMessage.success('已连接到厨房系统')
   }
-  
-  ws.onmessage = (event) => {
+
+  ws.onmessage = event => {
     const message = JSON.parse(event.data)
     handleWebSocketMessage(message)
   }
-  
+
   ws.onclose = () => {
     wsConnected.value = false
     setTimeout(() => {
@@ -37,7 +37,7 @@ const connectWebSocket = () => {
       }
     }, 5000)
   }
-  
+
   ws.onerror = () => {
     wsConnected.value = false
   }
@@ -58,7 +58,9 @@ const handleWebSocketMessage = (message: any) => {
 }
 
 const playNotificationSound = () => {
-  const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZSA0PVanu8blqFgUuh9Dz2YU2Bhxqv+zplkcODVGm5O+4ZSAEMYrO89GFNwYdcfDr4pVFDA1Pp+XysWUeBjiS1/LNfi0GI33R8tOENAcdcO/r4ZdJDQtPp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxmUgBDeOzvPVhjYGHG3A7uSaSQ0MTKjl8sZmIAU2jc7z1YU1Bhxwv+zmmUgNC1Gn5O/EZSAFNo/M89CEMwYccPDs4ppIDQtRp+TvvWUfBTiOz/PShjUGG3Dw7OKbSA0LUqjl8b1oHwU3jM3z0oU1Bxtw8OzhmUgNC1Ko5fG+ZyAFN4vM89CEMwYccO/t4plHDAtRqOXyxWUfBTiKzvPVhjYGHG3A7eSaSQ0LUqjl8b1nHwU3is7z1YU1Bxtw8OzhmUgNC1Ko5fG/ZyAFN4rO89CEMwYccPDs4ppIDQtRp+TvvWUfBTiOz/PShjUGG3Dw7OKbSA0LUqjl8b1nHwU3is7z1YU1Bxtw8OzhmUgNC1Ko5fG/ZyAFN4rO89CEMwYccPDs4ppIDQtRp+TvvWUfBTiOz/PShjUGG3Dw7OKbSA0LUqjl8b1nHwU3is7z1YU1Bxtw8OzhmUgNC1Ko5fG/ZyA==')
+  const audio = new Audio(
+    'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZSA0PVanu8blqFgUuh9Dz2YU2Bhxqv+zplkcODVGm5O+4ZSAEMYrO89GFNwYdcfDr4pVFDA1Pp+XysWUeBjiS1/LNfi0GI33R8tOENAcdcO/r4ZdJDQtPp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxmUgBDeOzvPVhjYGHG3A7uSaSQ0MTKjl8sZmIAU2jc7z1YU1Bhxwv+zmmUgNC1Gn5O/EZSAFNo/M89CEMwYccPDs4ppIDQtRp+TvvWUfBTiOz/PShjUGG3Dw7OKbSA0LUqjl8b1oHwU3jM3z0oU1Bxtw8OzhmUgNC1Ko5fG+ZyAFN4vM89CEMwYccO/t4plHDAtRqOXyxWUfBTiKzvPVhjYGHG3A7eSaSQ0LUqjl8b1nHwU3is7z1YU1Bxtw8OzhmUgNC1Ko5fG/ZyAFN4rO89CEMwYccPDs4ppIDQtRp+TvvWUfBTiOz/PShjUGG3Dw7OKbSA0LUqjl8b1nHwU3is7z1YU1Bxtw8OzhmUgNC1Ko5fG/ZyAFN4rO89CEMwYccPDs4ppIDQtRp+TvvWUfBTiOz/PShjUGG3Dw7OKbSA0LUqjl8b1nHwU3is7z1YU1Bxtw8OzhmUgNC1Ko5fG/ZyA=='
+  )
   audio.play().catch(() => {})
 }
 
@@ -77,10 +79,10 @@ const loadOrders = async () => {
 // 排序后的订单
 const sortedOrders = computed(() => {
   const sorted = [...orders.value]
-  
+
   sorted.sort((a, b) => {
     let comparison = 0
-    
+
     switch (sortBy.value) {
       case 'time':
         comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -92,10 +94,10 @@ const sortedOrders = computed(() => {
         comparison = a.status - b.status
         break
     }
-    
+
     return sortOrder.value === 'asc' ? comparison : -comparison
   })
-  
+
   return sorted
 })
 
@@ -167,7 +169,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="kitchen-page" v-loading="loading">
+  <div v-loading="loading" class="kitchen-page">
     <!-- 顶部统计栏 -->
     <div class="stats-bar">
       <div class="stat-item">
@@ -194,7 +196,7 @@ onUnmounted(() => {
     <!-- 主标题和控制栏 -->
     <div class="header">
       <h1>🍳 后厨订单管理</h1>
-      
+
       <div class="controls">
         <!-- 排序按钮 -->
         <div class="sort-buttons">
@@ -221,12 +223,12 @@ onUnmounted(() => {
             状态 {{ sortBy === 'status' ? (sortOrder === 'asc' ? '↑' : '↓') : '' }}
           </el-button>
         </div>
-        
+
         <div class="connection-status">
           <el-tag :type="wsConnected ? 'success' : 'danger'" size="large">
             {{ wsConnected ? '🟢 已连接' : '🔴 未连接' }}
           </el-tag>
-          <el-button @click="loadOrders" icon="Refresh">刷新</el-button>
+          <el-button icon="Refresh" @click="loadOrders">刷新</el-button>
         </div>
       </div>
     </div>
@@ -244,7 +246,7 @@ onUnmounted(() => {
         v-for="order in sortedOrders"
         :key="order.id"
         class="order-card"
-        :class="{ 'urgent': order.status === 1, 'new': order.status === 0 }"
+        :class="{ urgent: order.status === 1, new: order.status === 0 }"
       >
         <template #header>
           <div class="order-header">
@@ -264,7 +266,7 @@ onUnmounted(() => {
             v-for="item in order.items"
             :key="item.id"
             class="item-row"
-            :class="{ 'finished': item.status === 2, 'cooking': item.status === 1 }"
+            :class="{ finished: item.status === 2, cooking: item.status === 1 }"
           >
             <div class="item-main">
               <div class="item-info">
@@ -273,12 +275,12 @@ onUnmounted(() => {
               </div>
               <span v-if="item.remark" class="item-remark">{{ item.remark }}</span>
             </div>
-            
+
             <div class="item-actions">
               <el-tag :type="getStatusType(item.status)" size="small" class="status-tag">
                 {{ getStatusLabel(item.status) }}
               </el-tag>
-              
+
               <el-button
                 v-if="item.status === 0"
                 type="primary"
@@ -295,11 +297,13 @@ onUnmounted(() => {
               >
                 完成
               </el-button>
-              <el-icon v-if="item.status === 2" class="check-icon" color="#67c23a" :size="20"><Check /></el-icon>
+              <el-icon v-if="item.status === 2" class="check-icon" color="#67c23a" :size="20"
+                ><Check
+              /></el-icon>
             </div>
           </div>
         </div>
-        
+
         <div v-if="order.remark" class="order-remark">
           <span class="remark-label">备注:</span> {{ order.remark }}
         </div>
@@ -441,13 +445,23 @@ onUnmounted(() => {
 }
 
 @keyframes glow-blue {
-  0%, 100% { box-shadow: 0 0 5px rgba(64, 158, 255, 0.5); }
-  50% { box-shadow: 0 0 20px rgba(64, 158, 255, 0.8); }
+  0%,
+  100% {
+    box-shadow: 0 0 5px rgba(64, 158, 255, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(64, 158, 255, 0.8);
+  }
 }
 
 @keyframes glow-red {
-  0%, 100% { box-shadow: 0 0 5px rgba(233, 69, 96, 0.5); }
-  50% { box-shadow: 0 0 20px rgba(233, 69, 96, 0.8); }
+  0%,
+  100% {
+    box-shadow: 0 0 5px rgba(233, 69, 96, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(233, 69, 96, 0.8);
+  }
 }
 
 .order-card :deep(.el-card__header) {

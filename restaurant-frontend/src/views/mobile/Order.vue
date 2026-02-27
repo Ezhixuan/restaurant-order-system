@@ -39,27 +39,27 @@ const submitOrder = async () => {
         dishImage: item.image,
         price: item.price,
         quantity: item.quantity,
-        remark: item.remark
+        remark: item.remark,
       })),
-      remark: remark.value
+      remark: remark.value,
     }
 
     await createOrder(orderData)
     closeToast()
-    
+
     // 保存桌台信息到变量，因为 clearCart 会清除 store
     const tableId = cartStore.tableId
     const tableNo = cartStore.tableNo
-    
+
     cartStore.clearCart()
-    
+
     // 跳转到成功页面，携带桌台信息
     router.replace({
       path: '/m/success',
       query: {
         tableId: tableId?.toString(),
-        tableNo: tableNo
-      }
+        tableNo: tableNo,
+      },
     })
   } catch (error: any) {
     closeToast()
@@ -73,16 +73,16 @@ const submitOrder = async () => {
 <template>
   <div class="order-page">
     <van-nav-bar title="确认订单" left-arrow @click-left="$router.back()" />
-    
+
     <!-- 用餐人数 -->
     <van-cell-group title="用餐信息" style="margin-top: 10px">
-      <van-field label="用餐人数" type="digit" v-model="customerCount">
+      <van-field v-model="customerCount" label="用餐人数" type="digit">
         <template #input>
           <van-stepper v-model="customerCount" :min="1" :max="50" />
         </template>
       </van-field>
     </van-cell-group>
-    
+
     <!-- 订单商品 -->
     <van-cell-group title="订单商品">
       <van-cell
@@ -96,10 +96,10 @@ const submitOrder = async () => {
           <div class="price">¥{{ (item.price * item.quantity).toFixed(2) }}</div>
         </template>
       </van-cell>
-      
+
       <van-cell title="合计" :value="`¥${totalAmount.toFixed(2)}`" class="total" />
     </van-cell-group>
-    
+
     <!-- 备注 -->
     <van-cell-group title="订单备注" style="margin-top: 10px">
       <van-field
@@ -110,21 +110,15 @@ const submitOrder = async () => {
         placeholder="请输入备注，如口味偏好等"
       />
     </van-cell-group>
-    
+
     <!-- 支付方式说明 -->
     <van-cell-group title="支付说明" style="margin-top: 10px">
       <van-cell title="支付方式" value="到店扫码支付" />
     </van-cell-group>
-    
+
     <!-- 提交按钮 -->
     <div class="submit-area">
-      <van-button
-        type="primary"
-        size="large"
-        round
-        :loading="submitting"
-        @click="submitOrder"
-      >
+      <van-button type="primary" size="large" round :loading="submitting" @click="submitOrder">
         确认下单
       </van-button>
     </div>
