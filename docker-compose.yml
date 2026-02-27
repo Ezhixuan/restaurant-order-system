@@ -20,6 +20,8 @@ services:
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
       --lower_case_table_names=1
+      --init-connect='SET NAMES utf8mb4'
+      --skip-character-set-client-handshake
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p1q2w3e4r5%"]
       interval: 10s
