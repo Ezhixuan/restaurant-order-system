@@ -3,6 +3,9 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 
+// 主题样式（必须在组件库样式之前引入）
+import '@/styles/theme.css'
+
 // Element Plus
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
