@@ -1,16 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import type { CartItem } from '@/types'
 
-export interface CartItem {
-  dishId: number
-  specId?: number       // 规格ID(可选)
-  name: string          // 菜品名称
-  specName?: string     // 规格名称
-  price: number
-  image?: string
-  quantity: number
-  remark?: string
-}
+export type { CartItem } from '@/types'
 
 export const useCartStore = defineStore('cart', () => {
   // State
@@ -21,7 +13,9 @@ export const useCartStore = defineStore('cart', () => {
 
   // Getters
   const totalCount = computed(() => items.value.reduce((sum, item) => sum + item.quantity, 0))
-  const totalAmount = computed(() => items.value.reduce((sum, item) => sum + item.price * item.quantity, 0))
+  const totalAmount = computed(() =>
+    items.value.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  )
 
   // Actions
   const addItem = (item: CartItem) => {
@@ -31,7 +25,7 @@ export const useCartStore = defineStore('cart', () => {
       const existingKey = i.specId ? `${i.dishId}-${i.specId}` : `${i.dishId}`
       return existingKey === key
     })
-    
+
     if (existingIndex > -1) {
       items.value[existingIndex].quantity += item.quantity
     } else {
@@ -45,7 +39,7 @@ export const useCartStore = defineStore('cart', () => {
       const existingKey = i.specId ? `${i.dishId}-${i.specId}` : `${i.dishId}`
       return existingKey === key
     })
-    
+
     if (index > -1) {
       if (quantity <= 0) {
         items.value.splice(index, 1)
@@ -102,6 +96,6 @@ export const useCartStore = defineStore('cart', () => {
     updateRemark,
     removeItem,
     clearCart,
-    setTableInfo
+    setTableInfo,
   }
 })

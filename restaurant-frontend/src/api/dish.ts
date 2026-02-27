@@ -1,27 +1,7 @@
 import request from '@/utils/request'
-import type { SpecItem } from './dishSpec'
+import type { Dish, Category, SpecItem } from '@/types'
 
-export interface Dish {
-  id: number
-  categoryId: number
-  name: string
-  description?: string
-  price: number
-  image?: string
-  stock: number
-  isRecommend: number
-  status: number
-  sortOrder: number
-  hasSpecs: number
-  specs?: SpecItem[]
-}
-
-export interface Category {
-  id: number
-  name: string
-  sortOrder: number
-  status: number
-}
+export type { Dish, Category, SpecItem } from '@/types'
 
 // 获取分类列表
 export function getCategories(): Promise<Category[]> {
@@ -34,7 +14,10 @@ export function createCategory(data: { name: string; sortOrder?: number }): Prom
 }
 
 // 更新分类
-export function updateCategory(id: number, data: { name: string; sortOrder?: number }): Promise<void> {
+export function updateCategory(
+  id: number,
+  data: { name: string; sortOrder?: number }
+): Promise<void> {
   return request.put(`/dishes/categories/${id}`, data)
 }
 

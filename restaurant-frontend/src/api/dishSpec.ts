@@ -1,12 +1,7 @@
 import request from '@/utils/request'
+import type { SpecItem } from '@/types'
 
-export interface SpecItem {
-  id?: number
-  name: string
-  price: number
-  sortOrder?: number
-  status?: number
-}
+export type { SpecItem } from '@/types'
 
 // 获取菜品的所有规格
 export function getDishSpecs(dishId: number): Promise<SpecItem[]> {
@@ -24,7 +19,12 @@ export function getSpecById(id: number): Promise<SpecItem> {
 }
 
 // 创建规格
-export function createSpec(data: { dishId: number; name: string; price: number; sortOrder?: number }): Promise<SpecItem> {
+export function createSpec(data: {
+  dishId: number
+  name: string
+  price: number
+  sortOrder?: number
+}): Promise<SpecItem> {
   return request.post('/dish-specs', data)
 }
 
